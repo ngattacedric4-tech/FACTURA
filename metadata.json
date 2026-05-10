@@ -1,0 +1,6 @@
+{
+  "name": "Factura",
+  "description": "SaaS de facturation et comptabilité simple pour les PME ivoiriennes avec conformité DGI et paiements Wave.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
