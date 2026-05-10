@@ -1,20 +1,44 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# FACTURA — Solution de facturation pour PME ivoiriennes
 
-# Run and deploy your AI Studio app
+Application SaaS de facturation conçue pour les entrepreneurs et PME de Côte d'Ivoire. Conforme DGI, paiement mobile money intégré, assistant IA.
 
-This contains everything you need to run your app locally.
+**Demo live :** [factura-zwrz.vercel.app](https://factura-zwrz.vercel.app)
 
-View your app in AI Studio: https://ai.studio/apps/60eb7f4c-c44a-40a6-8e82-7c76d0817eef
+## Stack technique
 
-## Run Locally
+- **Frontend :** React + TypeScript + Vite + Tailwind CSS
+- **Backend :** Supabase (PostgreSQL + Auth + Edge Functions)
+- **Déploiement :** Vercel
 
-**Prerequisites:**  Node.js
+## Lancer en local
 
+**Prérequis :** Node.js 18+
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+1. Installer les dépendances :
+   ```bash
+   npm install
+   ```
+
+2. Copier le fichier d'environnement :
+   ```bash
+   cp .env.example .env.local
+   ```
+
+3. Renseigner les variables dans `.env.local` :
+   ```
+   VITE_SUPABASE_URL=...
+   VITE_SUPABASE_ANON_KEY=...
+   ```
+
+4. Lancer le serveur de développement :
+   ```bash
+   npm run dev
+   ```
+
+## Comptes de démonstration
+
+| Email | Mot de passe | Plan |
+|-------|-------------|------|
+| starter@demo-factura.ci | Demo@2024 | Gratuit |
+| pro@demo-factura.ci | Demo@2024 | Pro |
+| business@demo-factura.ci | Demo@2024 | Business |
