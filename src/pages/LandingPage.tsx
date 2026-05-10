@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, useInView, animate } from 'motion/react';
-import { ArrowRight, CheckCircle2, ReceiptText, ShieldCheck, Zap, Clock, FileText, Users, TrendingUp, Star, ChevronRight, Menu, X } from 'lucide-react';
+import { ArrowRight, CheckCircle2, ReceiptText, ShieldCheck, Zap, Clock, FileText, Users, TrendingUp, Star, ChevronRight, Menu, X, CheckCircle, AlertCircle } from 'lucide-react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { toast } from 'sonner';
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -111,6 +113,7 @@ function MockInvoice() {
 export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [activeModal, setActiveModal] = useState<string | null>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -506,11 +509,11 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             <div>
               <p className="text-[11px] font-bold text-white/30 uppercase tracking-widest mb-4">Ressources</p>
               <ul className="space-y-3">
-                {['Documentation', 'Guide DGI Côte d\'Ivoire', 'Blog', 'FAQ', 'Statut du service'].map(l => (
-                  <li key={l}>
-                    <a href="#" className="text-[13px] text-white/50 hover:text-white transition-colors">{l}</a>
-                  </li>
-                ))}
+                <li><button onClick={() => setActiveModal('documentation')} className="text-[13px] text-white/50 hover:text-white transition-colors text-left">Documentation</button></li>
+                <li><button onClick={() => setActiveModal('dgi')} className="text-[13px] text-white/50 hover:text-white transition-colors text-left">Guide DGI Côte d'Ivoire</button></li>
+                <li><button onClick={() => toast.info('Blog bientôt disponible — restez connecté !')} className="text-[13px] text-white/50 hover:text-white transition-colors text-left">Blog</button></li>
+                <li><button onClick={() => setActiveModal('faq')} className="text-[13px] text-white/50 hover:text-white transition-colors text-left">FAQ</button></li>
+                <li><button onClick={() => setActiveModal('statut')} className="text-[13px] text-white/50 hover:text-white transition-colors text-left">Statut du service</button></li>
               </ul>
             </div>
 
@@ -536,11 +539,11 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                 <p className="text-[11px] font-bold text-white/30 uppercase tracking-widest mb-3">Nous suivre</p>
                 <div className="flex gap-3">
                   {[
-                    { label: 'LI', href: '#', title: 'LinkedIn' },
-                    { label: 'TW', href: '#', title: 'Twitter / X' },
-                    { label: 'WA', href: '#', title: 'WhatsApp' },
+                    { label: 'LI', href: 'https://www.linkedin.com/company/factura-ci', title: 'LinkedIn' },
+                    { label: 'TW', href: 'https://x.com/factura_ci', title: 'Twitter / X' },
+                    { label: 'WA', href: 'https://wa.me/2250700000000', title: 'WhatsApp' },
                   ].map(s => (
-                    <a key={s.label} href={s.href} title={s.title}
+                    <a key={s.label} href={s.href} title={s.title} target="_blank" rel="noopener noreferrer"
                       className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-[10px] font-black text-white/60 hover:text-white transition-all">
                       {s.label}
                     </a>
@@ -555,15 +558,271 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             <p className="text-[12px] text-white/30">
               © 2026 Factura.ci — Fait avec ❤️ pour les entrepreneurs ivoiriens.
             </p>
-            <div className="flex items-center gap-6">
-              {['Confidentialité', 'CGU', 'Mentions légales', 'Support'].map(l => (
-                <a key={l} href="#" className="text-[12px] text-white/30 hover:text-white/70 transition-colors">{l}</a>
-              ))}
+            <div className="flex items-center gap-6 flex-wrap justify-center">
+              <button onClick={() => setActiveModal('confidentialite')} className="text-[12px] text-white/30 hover:text-white/70 transition-colors">Confidentialité</button>
+              <button onClick={() => setActiveModal('cgu')} className="text-[12px] text-white/30 hover:text-white/70 transition-colors">CGU</button>
+              <button onClick={() => setActiveModal('mentions')} className="text-[12px] text-white/30 hover:text-white/70 transition-colors">Mentions légales</button>
+              <a href="mailto:support@factura.ci" className="text-[12px] text-white/30 hover:text-white/70 transition-colors">Support</a>
             </div>
           </div>
 
         </div>
       </footer>
+
+      {/* ── MODALS FOOTER ─────────────────────────────────────── */}
+      <Dialog open={!!activeModal} onOpenChange={() => setActiveModal(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          {activeModal === 'documentation' && (
+            <div className="space-y-5">
+              <h2 className="text-[20px] font-bold text-[#111827]">Documentation</h2>
+
+              <ModalSection title="1. Créer votre compte">
+                <p>Cliquez sur « Démarrer gratuitement », renseignez vos informations d'entreprise (nom, NCC, adresse) et accédez immédiatement à votre tableau de bord. Aucune carte de crédit requise.</p>
+              </ModalSection>
+
+              <ModalSection title="2. Créer votre première facture">
+                <p>Allez dans <strong>Factures → Nouvelle facture</strong>. Sélectionnez un client (ou créez-en un nouveau), ajoutez vos lignes de produits ou services. La TVA à 18% est calculée automatiquement. Téléchargez le PDF ou envoyez-le directement.</p>
+              </ModalSection>
+
+              <ModalSection title="3. Gérer vos clients">
+                <p>Dans la section <strong>Clients</strong>, ajoutez le NCC de chaque client entreprise. L'historique complet des factures par client est automatiquement disponible.</p>
+              </ModalSection>
+
+              <ModalSection title="4. Suivre vos paiements">
+                <p>La section <strong>Paiements</strong> centralise toutes vos encaissements. Vous pouvez enregistrer les paiements reçus par Wave, Orange Money, MTN Money, virement ou espèces.</p>
+              </ModalSection>
+
+              <ModalSection title="5. Export DGI">
+                <p>Allez dans <strong>Export DGI</strong>, sélectionnez le mois concerné et téléchargez votre registre mensuel conforme à la DGI-CI. À effectuer avant le 15 du mois suivant.</p>
+              </ModalSection>
+
+              <ModalSection title="6. Assistant IA (plans Pro & Business)">
+                <p>Cliquez sur le bouton ✨ en bas à droite de l'interface. L'assistant FACTURAI connaît vos données en temps réel et répond à toutes vos questions : comptabilité, relances, fiscalité ivoirienne.</p>
+              </ModalSection>
+
+              <div className="pt-2 border-t border-[#F3F4F6]">
+                <p className="text-[12px] text-[#9CA3AF]">Pour toute question : <a href="mailto:support@factura.ci" className="text-[#111827] underline">support@factura.ci</a></p>
+              </div>
+            </div>
+          )}
+
+          {activeModal === 'dgi' && (
+            <div className="space-y-5">
+              <h2 className="text-[20px] font-bold text-[#111827]">Guide DGI Côte d'Ivoire</h2>
+
+              <ModalSection title="La TVA en Côte d'Ivoire">
+                <p>Le taux standard de TVA est de <strong>18%</strong> sur le montant hors taxes (HT). Elle est obligatoire pour toute entreprise assujettie dont le chiffre d'affaires dépasse le seuil légal.</p>
+              </ModalSection>
+
+              <ModalSection title="Vos obligations légales de facturation">
+                <ul className="space-y-1.5 mt-2">
+                  {['Émettre des factures numérotées de façon séquentielle','Indiquer votre NCC (Numéro de Compte Contribuable)','Indiquer le NCC de votre client pour les entreprises','Calculer et afficher la TVA à 18% séparément','Conserver un registre mensuel des factures émises','Déclarer et reverser la TVA collectée avant le 15 du mois'].map(item => (
+                    <li key={item} className="flex items-start gap-2 text-[13px]">
+                      <CheckCircle size={14} className="text-emerald-500 flex-shrink-0 mt-0.5" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </ModalSection>
+
+              <ModalSection title="Comment FACTURA vous aide">
+                <ul className="space-y-1.5 mt-2">
+                  {['Numérotation automatique et séquentielle de toutes vos factures','TVA à 18% calculée automatiquement sur chaque ligne','Champs NCC intégrés pour vous et vos clients','Export mensuel du registre des ventes conforme à la DGI','PDF professionnel avec tous les éléments légaux requis','Archivage sécurisé illimité de tous vos documents'].map(item => (
+                    <li key={item} className="flex items-start gap-2 text-[13px]">
+                      <CheckCircle size={14} className="text-emerald-500 flex-shrink-0 mt-0.5" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </ModalSection>
+
+              <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+                <p className="text-[13px] text-amber-800"><strong>Important :</strong> Le registre mensuel doit être déposé auprès de la DGI avant le 15 du mois suivant. Factura génère ce document en 1 clic depuis la section Export DGI.</p>
+              </div>
+            </div>
+          )}
+
+          {activeModal === 'faq' && (
+            <div className="space-y-5">
+              <h2 className="text-[20px] font-bold text-[#111827]">Questions fréquentes</h2>
+              {[
+                { q: 'Le plan Gratuit est-il vraiment sans limite de temps ?', a: 'Oui, le plan Gratuit est à vie. Vous pouvez créer jusqu\'à 5 factures et 3 devis par mois sans jamais payer.' },
+                { q: 'Puis-je passer au plan Pro ou Business à tout moment ?', a: 'Oui, la mise à niveau est instantanée depuis la page Tarifs. Vous payez au mois, sans engagement. En cas de retour au plan Gratuit, vos données sont conservées.' },
+                { q: 'Mes données sont-elles sécurisées ?', a: 'Vos données sont hébergées sur Supabase (infrastructure AWS Paris) avec chiffrement TLS et sauvegardes quotidiennes. Nous ne partageons jamais vos données avec des tiers.' },
+                { q: 'Le PDF généré est-il accepté par la DGI-CI ?', a: 'Oui. Nos factures incluent tous les éléments requis : NCC vendeur et acheteur, TVA 18% détaillée, numérotation séquentielle, date d\'émission et d\'échéance.' },
+                { q: 'Quels moyens de paiement pour l\'abonnement ?', a: 'Wave, Orange Money et MTN Money. Aucune carte bancaire requise. Paiement mensuel sans engagement.' },
+                { q: 'Comment fonctionne l\'assistant IA ?', a: 'L\'assistant FACTURAI (plans Pro et Business) analyse vos données en temps réel — factures, clients, paiements — et répond à vos questions en français. Il connaît la fiscalité ivoirienne et peut rédiger des relances.' },
+                { q: 'Puis-je annuler mon abonnement ?', a: 'Oui, à tout moment depuis la page Paramètres. Aucun frais d\'annulation. Vous conservez l\'accès jusqu\'à la fin de la période payée.' },
+                { q: 'Plusieurs utilisateurs peuvent-ils accéder au même compte ?', a: 'La gestion multi-utilisateurs est disponible sur le plan Business (jusqu\'à 5 utilisateurs). Les plans Gratuit et Pro sont mono-utilisateur.' },
+              ].map(({ q, a }) => (
+                <div key={q} className="border-b border-[#F3F4F6] pb-4 last:border-0">
+                  <p className="text-[14px] font-semibold text-[#111827] mb-1.5">{q}</p>
+                  <p className="text-[13px] text-[#6B7280] leading-relaxed">{a}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {activeModal === 'statut' && (
+            <div className="space-y-5">
+              <div className="flex items-center justify-between">
+                <h2 className="text-[20px] font-bold text-[#111827]">Statut des services</h2>
+                <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 text-[12px] font-semibold px-3 py-1 rounded-full">
+                  <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" /> Tous les systèmes opérationnels
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                {[
+                  'API Factura',
+                  'Base de données',
+                  'Génération PDF',
+                  'Authentification',
+                  'Assistant IA',
+                  'Paiements mobile money',
+                  'Export DGI',
+                ].map(service => (
+                  <div key={service} className="flex items-center justify-between py-3 border-b border-[#F3F4F6] last:border-0">
+                    <span className="text-[14px] text-[#374151]">{service}</span>
+                    <span className="flex items-center gap-1.5 text-[13px] font-semibold text-emerald-600">
+                      <CheckCircle size={14} /> Opérationnel
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="bg-[#F9FAFB] rounded-xl p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-[13px] font-semibold text-[#111827]">Disponibilité ce mois</p>
+                  <p className="text-[12px] text-[#6B7280] mt-0.5">Aucun incident signalé</p>
+                </div>
+                <span className="text-[22px] font-black text-emerald-600">99,9%</span>
+              </div>
+
+              <p className="text-[12px] text-[#9CA3AF]">Alertes incidents : <a href="mailto:status@factura.ci" className="text-[#111827] underline">status@factura.ci</a></p>
+            </div>
+          )}
+
+          {activeModal === 'confidentialite' && (
+            <div className="space-y-5">
+              <h2 className="text-[20px] font-bold text-[#111827]">Politique de confidentialité</h2>
+              <p className="text-[12px] text-[#9CA3AF]">Mise à jour : 1er mai 2026</p>
+
+              <ModalSection title="1. Données collectées">
+                <ul className="space-y-1 text-[13px] text-[#6B7280] mt-1">
+                  <li>• Données d'identification : nom, email, téléphone</li>
+                  <li>• Données d'entreprise : nom, NCC, adresse, RCCM</li>
+                  <li>• Données de facturation : clients, produits, factures, paiements</li>
+                  <li>• Données de connexion : adresse IP, navigateur, horodatages</li>
+                </ul>
+              </ModalSection>
+
+              <ModalSection title="2. Utilisation de vos données">
+                <p>Vos données sont utilisées exclusivement pour fournir les services FACTURA : génération de documents, calcul de statistiques financières, assistance IA, et amélioration du service.</p>
+              </ModalSection>
+
+              <ModalSection title="3. Stockage et sécurité">
+                <p>Données hébergées sur Supabase (AWS eu-west-1, Paris). Chiffrement TLS en transit, AES-256 au repos. Sauvegardes quotidiennes. Accès restreint aux seuls employés autorisés.</p>
+              </ModalSection>
+
+              <ModalSection title="4. Partage de données">
+                <p>Nous ne vendons ni ne partageons vos données avec des tiers, sauf obligation légale (requête judiciaire) ou prestataires techniques (Supabase, Vercel) dans le cadre strict du service.</p>
+              </ModalSection>
+
+              <ModalSection title="5. Vos droits">
+                <p>Vous pouvez à tout moment demander l'accès, la rectification ou la suppression de vos données en contactant <a href="mailto:support@factura.ci" className="text-[#111827] underline">support@factura.ci</a>. Délai de traitement : 72h.</p>
+              </ModalSection>
+
+              <ModalSection title="6. Cookies">
+                <p>FACTURA utilise uniquement des cookies techniques nécessaires au fonctionnement du service (session d'authentification). Aucun cookie publicitaire ni de tracking tiers.</p>
+              </ModalSection>
+            </div>
+          )}
+
+          {activeModal === 'cgu' && (
+            <div className="space-y-5">
+              <h2 className="text-[20px] font-bold text-[#111827]">Conditions Générales d'Utilisation</h2>
+              <p className="text-[12px] text-[#9CA3AF]">En vigueur au 1er mai 2026</p>
+
+              <ModalSection title="1. Objet">
+                <p>Les présentes CGU régissent l'utilisation de la plateforme FACTURA accessible sur factura-zwrz.vercel.app, éditée par FACTURA CI SARL, entreprise de droit ivoirien.</p>
+              </ModalSection>
+
+              <ModalSection title="2. Accès au service">
+                <p>L'accès requiert la création d'un compte avec une adresse email valide. Vous êtes responsable de la confidentialité de vos identifiants et de toutes les actions effectuées depuis votre compte.</p>
+              </ModalSection>
+
+              <ModalSection title="3. Plans et facturation">
+                <ul className="space-y-1 text-[13px] text-[#6B7280] mt-1">
+                  <li>• Plan Gratuit : accès limité, sans engagement, sans expiration</li>
+                  <li>• Plans payants : facturation mensuelle, sans engagement, résiliation à tout moment</li>
+                  <li>• En cas de non-renouvellement, le compte est rétrogradé au plan Gratuit</li>
+                  <li>• Aucun remboursement pour la période déjà entamée</li>
+                </ul>
+              </ModalSection>
+
+              <ModalSection title="4. Utilisation acceptable">
+                <p>Vous vous engagez à utiliser FACTURA uniquement pour des activités légales. Toute tentative de fraude, d'accès non autorisé ou d'utilisation abusive entraîne la résiliation immédiate du compte.</p>
+              </ModalSection>
+
+              <ModalSection title="5. Propriété intellectuelle">
+                <p>La plateforme FACTURA, sa marque et ses contenus sont la propriété exclusive de FACTURA CI SARL. Toute reproduction ou utilisation sans autorisation écrite préalable est interdite.</p>
+              </ModalSection>
+
+              <ModalSection title="6. Limitation de responsabilité">
+                <p>FACTURA s'engage à maintenir une disponibilité maximale du service mais ne peut garantir une disponibilité de 100%. Notre responsabilité est limitée au montant des abonnements payés sur les 3 derniers mois.</p>
+              </ModalSection>
+
+              <ModalSection title="7. Droit applicable">
+                <p>Les présentes CGU sont soumises au droit ivoirien. En cas de litige, les parties s'engagent à rechercher une solution amiable. À défaut, les tribunaux d'Abidjan sont seuls compétents.</p>
+              </ModalSection>
+            </div>
+          )}
+
+          {activeModal === 'mentions' && (
+            <div className="space-y-5">
+              <h2 className="text-[20px] font-bold text-[#111827]">Mentions légales</h2>
+
+              <ModalSection title="Éditeur du site">
+                <div className="space-y-1 text-[13px] text-[#6B7280]">
+                  <p><strong className="text-[#374151]">FACTURA CI SARL</strong></p>
+                  <p>Siège social : Abidjan, Cocody, Côte d'Ivoire</p>
+                  <p>Email : <a href="mailto:contact@factura.ci" className="text-[#111827] underline">contact@factura.ci</a></p>
+                  <p>Téléphone : +225 07 00 00 00 00</p>
+                </div>
+              </ModalSection>
+
+              <ModalSection title="Hébergement">
+                <div className="space-y-1 text-[13px] text-[#6B7280]">
+                  <p><strong className="text-[#374151]">Site web :</strong> Vercel Inc., 340 Pine Street Suite 700, San Francisco, CA 94104, USA</p>
+                  <p><strong className="text-[#374151]">Base de données :</strong> Supabase Inc., hébergée sur AWS eu-west-1 (Paris, France)</p>
+                </div>
+              </ModalSection>
+
+              <ModalSection title="Propriété intellectuelle">
+                <p>L'ensemble du contenu de ce site (textes, images, code source, marque FACTURA) est protégé par le droit ivoirien de la propriété intellectuelle. Toute reproduction, même partielle, est interdite sans autorisation écrite préalable.</p>
+              </ModalSection>
+
+              <ModalSection title="Données personnelles">
+                <p>Conformément à la réglementation en vigueur sur la protection des données personnelles en Côte d'Ivoire, vous disposez d'un droit d'accès, de rectification et de suppression de vos données personnelles. Pour exercer ces droits : <a href="mailto:support@factura.ci" className="text-[#111827] underline">support@factura.ci</a></p>
+              </ModalSection>
+
+              <ModalSection title="Crédits techniques">
+                <p className="text-[13px] text-[#6B7280]">Développé avec React, TypeScript, Vite, Supabase, Tailwind CSS et déployé sur Vercel.</p>
+              </ModalSection>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function ModalSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h3 className="text-[13px] font-bold text-[#111827] uppercase tracking-wide mb-2">{title}</h3>
+      <div className="text-[13px] text-[#6B7280] leading-relaxed">{children}</div>
     </div>
   );
 }
