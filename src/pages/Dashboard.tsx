@@ -28,8 +28,18 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       ]);
       if (invoices) {
         const now = new Date(); const month = now.getMonth(); const year = now.getFullYear();
-        const monthly = invoices.filter(i => { const d = new Date(i.issue_date); return d.getMonth()===month && d.getFullYear()===year && i.status==='paid'; }).reduce((a,i)=>a+(i.total_ttc||0),0);
-        const unpaid = invoices.filter(i=>i.status==='sent'||i.status==='overdue').reduce((a,i)=>a+(i.total_ttc||0),0);
+        // CA du mois = factures du mois 'paid' (full) + avances encaissées sur 'partial' du mois.
+        const monthly = invoices
+          .filter(i => { const d = new Date(i.issue_date); return d.getMonth()===month && d.getFullYear()===year; })
+          .reduce((a, i) => {
+            if (i.status === 'paid') return a + (i.total_ttc || 0);
+            if (i.status === 'partial') return a + (i.advance_amount || 0);
+            return a;
+          }, 0);
+        // Impayés = solde restant (total - avance) sur sent/overdue/partial.
+        const unpaid = invoices
+          .filter(i => i.status === 'sent' || i.status === 'overdue' || i.status === 'partial')
+          .reduce((a, i) => a + ((i.total_ttc || 0) - (i.advance_amount || 0)), 0);
         const pendingEst = invoices.filter(i=>i.type==='estimate'&&i.status==='draft').reduce((a,i)=>a+(i.total_ttc||0),0);
         setStats({ totalMonthly: monthly, unpaid, pendingEstimates: pendingEst, activeClients: clientsCount||0 });
         setRecentInvoices(invoices.slice(0,5).map(i=>({ id:i.id, number:i.number, client_name:(i.clients as any)?.name||'Client inconnu', total_ttc:i.total_ttc, status:i.status, issue_date:i.issue_date })));
@@ -49,6 +59,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const statusMap: Record<string, {label:string;cls:string;icon?:React.ReactNode}> = {
     draft:   {label:'Brouillon',  cls:'bg-[#F3F4F6] text-[#6B7280]'},
     sent:    {label:'Envoyé',     cls:'bg-blue-50 text-blue-700',    icon:<Clock size={11} className="mr-1"/>},
+    partial: {label:'Partiel',    cls:'bg-amber-50 text-amber-700',  icon:<Clock size={11} className="mr-1"/>},
     paid:    {label:'Payée',      cls:'bg-emerald-50 text-emerald-700', icon:<CheckCircle2 size={11} className="mr-1"/>},
     overdue: {label:'En retard',  cls:'bg-red-50 text-red-700',      icon:<AlertCircle size={11} className="mr-1"/>},
     canceled:{label:'Annulée',    cls:'bg-[#F3F4F6] text-[#9CA3AF]'},

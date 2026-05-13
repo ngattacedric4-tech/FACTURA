@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
-import { InvoiceType, Client, Product } from '@/types/database';
+import { InvoiceType, Client, Product, PaymentMethod } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -69,6 +69,13 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
   const [isSaving, setIsSaving] = useState(false);
   const [invoiceNumber, setInvoiceNumber] = useState('');
 
+  // ─── Avance reçue à la commande (chefs de chantier, longues prestations) ───
+  const [hasAdvance, setHasAdvance] = useState(false);
+  const [advanceAmount, setAdvanceAmount] = useState<number>(0);
+  const [advanceMethod, setAdvanceMethod] = useState<PaymentMethod | ''>('');
+  const [advanceDate, setAdvanceDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [advanceReference, setAdvanceReference] = useState<string>('');
+
   useEffect(() => {
     if (company) {
       fetchData();
@@ -78,6 +85,13 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
         setIssueDate(existingInvoice.issue_date || new Date().toISOString().split('T')[0]);
         setStatus(existingInvoice.status || 'draft');
         setNotes(existingInvoice.notes || '');
+        if ((existingInvoice.advance_amount || 0) > 0) {
+          setHasAdvance(true);
+          setAdvanceAmount(existingInvoice.advance_amount || 0);
+          setAdvanceMethod((existingInvoice.advance_method || '') as PaymentMethod | '');
+          setAdvanceDate(existingInvoice.advance_date || new Date().toISOString().split('T')[0]);
+          setAdvanceReference(existingInvoice.advance_reference || '');
+        }
         if (existingInvoice.invoice_items?.length) {
           setLines(existingInvoice.invoice_items.map((item: any) => ({
             id: item.id || Math.random().toString(),
@@ -138,6 +152,18 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
   const calculateSubtotal = () => lines.reduce((acc, l) => acc + (l.quantity * l.unit_price), 0);
   const calculateTVA = () => lines.reduce((acc, l) => acc + (l.quantity * l.unit_price * (l.tva_rate / 100)), 0);
   const calculateTotal = () => calculateSubtotal() + calculateTVA();
+  const effectiveAdvance = () => {
+    if (!hasAdvance) return 0;
+    return Math.min(Math.max(0, advanceAmount), calculateTotal());
+  };
+  const calculateBalance = () => calculateTotal() - effectiveAdvance();
+  // Auto-derived status from advance — user can still override via Statut select.
+  const derivedStatus = () => {
+    const adv = effectiveAdvance();
+    if (!hasAdvance || adv <= 0) return status;
+    if (adv >= calculateTotal()) return 'paid';
+    return 'partial';
+  };
 
   const getCalculatedDueDate = () => {
     if (paymentTerms === 'custom') return customDueDate;
@@ -173,17 +199,41 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
       return;
     }
 
+    // Avance validation
+    if (hasAdvance) {
+      if (advanceAmount <= 0) {
+        toast.error("Veuillez saisir un montant d'avance positif (ou décochez l'option).");
+        return;
+      }
+      if (advanceAmount > calculateTotal()) {
+        toast.error("L'avance ne peut pas dépasser le total TTC.");
+        return;
+      }
+      if (!advanceMethod) {
+        toast.error("Veuillez sélectionner le mode de paiement de l'avance.");
+        return;
+      }
+    }
+
     setIsSaving(true);
 
     try {
       const finalNotes = subject ? `Objet: ${subject}\n\n${notes}` : notes;
       const finalTerms = paymentMethod ? `Mode de paiement: ${paymentMethod}` : '';
 
+      const advancePayload = {
+        advance_amount: hasAdvance ? effectiveAdvance() : 0,
+        advance_method: hasAdvance ? advanceMethod : null,
+        advance_date: hasAdvance ? advanceDate : null,
+        advance_reference: hasAdvance ? (advanceReference || null) : null,
+      };
+      const finalStatus = derivedStatus();
+
       let invoice: any;
       if (existingInvoice) {
         const { data, error: updErr } = await supabase.from('invoices').update({
           client_id: selectedClientId,
-          status,
+          status: finalStatus,
           issue_date: issueDate,
           due_date: dueDateToSave || null,
           notes: finalNotes,
@@ -191,6 +241,7 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
           subtotal_ht: calculateSubtotal(),
           total_tva: calculateTVA(),
           total_ttc: calculateTotal(),
+          ...advancePayload,
           updated_at: new Date().toISOString(),
         }).eq('id', existingInvoice.id).select().single();
         if (updErr) throw updErr;
@@ -202,7 +253,7 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
           client_id: selectedClientId,
           type,
           number: invoiceNumber,
-          status: status,
+          status: finalStatus,
           issue_date: issueDate,
           due_date: dueDateToSave || null,
           notes: finalNotes,
@@ -210,9 +261,12 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
           subtotal_ht: calculateSubtotal(),
           total_tva: calculateTVA(),
           total_ttc: calculateTotal(),
+          ...advancePayload,
         }).select().single();
         if (invError) throw invError;
         invoice = data;
+        // Note: trigger DB `sync_advance_to_payment` crée auto la ligne dans `payments`
+        // si advance_amount > 0 et advance_method renseigné. Pas besoin d'insert manuel ici.
       }
 
       const itemsToInsert = lines.map(l => ({
@@ -556,6 +610,111 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
               </div>
             </div>
 
+            {/* CARD 4 — Avance reçue (down-payment) */}
+            <div className="bg-[#FFFFFF] rounded-2xl p-8 shadow-sm border border-[#F3F4F6]">
+              <label className="flex items-start gap-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4 rounded border-[#D1D5DB] text-[#111827] focus:ring-[#111827]"
+                  checked={hasAdvance}
+                  disabled={!!savedInvoice}
+                  onChange={(e) => {
+                    setHasAdvance(e.target.checked);
+                    if (!e.target.checked) {
+                      setAdvanceAmount(0);
+                      setAdvanceMethod('');
+                      setAdvanceReference('');
+                    }
+                  }}
+                />
+                <div>
+                  <p className="text-[14px] font-semibold text-[#0A0A0A]">Avance reçue à la commande</p>
+                  <p className="text-[12px] text-[#6B7280] mt-0.5">
+                    Cas chefs de chantier, devis acceptés, longues prestations — saisissez le montant déjà encaissé.
+                  </p>
+                </div>
+              </label>
+
+              {hasAdvance && (
+                <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <Label className="text-[11px] font-bold uppercase tracking-widest text-[#9CA3AF]">Montant de l'avance (FCFA)</Label>
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        min={0}
+                        max={calculateTotal() || undefined}
+                        step="1"
+                        value={advanceAmount || ''}
+                        disabled={!!savedInvoice}
+                        onChange={(e) => setAdvanceAmount(Math.max(0, Number(e.target.value) || 0))}
+                        placeholder="Ex: 250000"
+                        className="h-11 rounded-xl border-[#E5E7EB] pr-14 font-mono"
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-[#9CA3AF] pointer-events-none">FCFA</span>
+                    </div>
+                    {advanceAmount > calculateTotal() && calculateTotal() > 0 && (
+                      <p className="text-[11px] text-red-600">
+                        Le montant dépasse le total TTC ({calculateTotal().toLocaleString('fr-FR')} FCFA).
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-[11px] font-bold uppercase tracking-widest text-[#9CA3AF]">Mode de l'avance</Label>
+                    <CustomSelect
+                      size="lg"
+                      value={advanceMethod}
+                      onChange={(v) => setAdvanceMethod(v as PaymentMethod | '')}
+                      disabled={!!savedInvoice}
+                      placeholder="Sélectionner…"
+                      options={[
+                        { value: 'cash',     label: 'Espèces' },
+                        { value: 'wave',     label: 'Wave' },
+                        { value: 'om',       label: 'Orange Money' },
+                        { value: 'mtn',      label: 'MTN Money' },
+                        { value: 'transfer', label: 'Virement bancaire' },
+                        { value: 'check',    label: 'Chèque' },
+                      ]}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-[11px] font-bold uppercase tracking-widest text-[#9CA3AF]">Date de l'avance</Label>
+                    <Input
+                      type="date"
+                      value={advanceDate}
+                      max={issueDate}
+                      disabled={!!savedInvoice}
+                      onChange={(e) => setAdvanceDate(e.target.value)}
+                      className="h-11 rounded-xl border-[#E5E7EB]"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-[11px] font-bold uppercase tracking-widest text-[#9CA3AF]">Référence (optionnel)</Label>
+                    <Input
+                      value={advanceReference}
+                      disabled={!!savedInvoice}
+                      onChange={(e) => setAdvanceReference(e.target.value)}
+                      placeholder="Ex: TXN-WAVE-9876"
+                      className="h-11 rounded-xl border-[#E5E7EB] font-mono text-[13px]"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2 flex items-center justify-between p-4 rounded-xl bg-emerald-50 border border-emerald-100">
+                    <div>
+                      <p className="text-[12px] font-semibold uppercase tracking-wider text-emerald-700">Reste à payer</p>
+                      <p className="text-[11px] text-emerald-600 mt-0.5">Calculé automatiquement</p>
+                    </div>
+                    <span className="text-xl font-bold font-mono text-emerald-700">
+                      {(calculateBalance() || 0).toLocaleString('fr-FR')} FCFA
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
           </div>
 
           {/* RIGHT COL - Sticky Recap */}
@@ -575,10 +734,24 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
                   <span className="text-sm font-mono font-medium text-[#111827]">{(calculateTVA() || 0).toLocaleString('fr-FR')} FCFA</span>
                 </div>
 
+                <div className="flex justify-between items-center py-3 border-b border-[#F3F4F6]">
+                  <span className="text-sm text-[#6B7280]">Total TTC</span>
+                  <span className="text-sm font-mono font-medium text-[#111827]">{(calculateTotal() || 0).toLocaleString('fr-FR')} FCFA</span>
+                </div>
+
+                {hasAdvance && effectiveAdvance() > 0 && (
+                  <div className="flex justify-between items-center py-3 border-b border-[#F3F4F6]">
+                    <span className="text-sm text-emerald-700">Avance reçue</span>
+                    <span className="text-sm font-mono font-medium text-emerald-700">− {effectiveAdvance().toLocaleString('fr-FR')} FCFA</span>
+                  </div>
+                )}
+
                 <div className="flex justify-between items-end pt-4 border-t-2 border-[#0A0A0A] mt-3">
-                  <span className="text-[14px] font-bold text-[#0A0A0A]">NET À PAYER</span>
+                  <span className="text-[14px] font-bold text-[#0A0A0A]">
+                    {hasAdvance && effectiveAdvance() > 0 ? 'RESTE À PAYER' : 'NET À PAYER'}
+                  </span>
                   <span className="text-xl font-bold font-mono text-[#0A0A0A]">
-                    {(calculateTotal() || 0).toLocaleString('fr-FR')} FCFA
+                    {(calculateBalance() || 0).toLocaleString('fr-FR')} FCFA
                   </span>
                 </div>
               </div>
@@ -591,9 +764,10 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
                     value={status}
                     onChange={setStatus}
                     options={[
-                      { value: 'draft', label: 'Brouillon' },
-                      { value: 'sent',  label: 'Envoyé' },
-                      { value: 'paid',  label: 'Payé' },
+                      { value: 'draft',   label: 'Brouillon' },
+                      { value: 'sent',    label: 'Envoyé' },
+                      { value: 'partial', label: 'Partiellement payé' },
+                      { value: 'paid',    label: 'Payé' },
                     ]}
                   />
                 </div>

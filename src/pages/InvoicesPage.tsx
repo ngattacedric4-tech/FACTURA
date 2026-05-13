@@ -207,18 +207,20 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
 
   const getStatusBadge = (status: string) => {
     let label = status;
-    let icon = null;
+    let icon: React.ReactNode = null;
+    let cls = 'bg-[#F3F4F6] text-[#111827] hover:bg-[#E5E7EB]';
     switch (status) {
-      case 'paid': label = 'Payée'; icon = <CheckCircle2 size={12} className="mr-1" />; break;
-      case 'overdue': label = 'En retard'; icon = <AlertCircle size={12} className="mr-1" />; break;
-      case 'sent': label = 'Envoyée'; icon = <Send size={12} className="mr-1" />; break;
-      case 'draft': label = 'Brouillon'; break;
-      case 'canceled': label = 'Annulée'; break;
-      case 'accepted': label = 'Accepté'; icon = <CheckCircle2 size={12} className="mr-1" />; break;
-      case 'rejected': label = 'Refusé'; break;
+      case 'paid':     label = 'Payée';     icon = <CheckCircle2 size={12} className="mr-1" />; cls = 'bg-emerald-50 text-emerald-700 hover:bg-emerald-50'; break;
+      case 'partial':  label = 'Partiel';   icon = <Clock size={12} className="mr-1" />;        cls = 'bg-amber-50 text-amber-700 hover:bg-amber-50'; break;
+      case 'overdue':  label = 'En retard'; icon = <AlertCircle size={12} className="mr-1" />;  cls = 'bg-red-50 text-red-700 hover:bg-red-50'; break;
+      case 'sent':     label = 'Envoyée';   icon = <Send size={12} className="mr-1" />;         cls = 'bg-blue-50 text-blue-700 hover:bg-blue-50'; break;
+      case 'draft':    label = 'Brouillon'; break;
+      case 'canceled': label = 'Annulée';   break;
+      case 'accepted': label = 'Accepté';   icon = <CheckCircle2 size={12} className="mr-1" />; cls = 'bg-emerald-50 text-emerald-700 hover:bg-emerald-50'; break;
+      case 'rejected': label = 'Refusé';    break;
     }
     return (
-      <Badge className="bg-[#F3F4F6] text-[#111827] hover:bg-[#E5E7EB] font-bold border-none px-3 py-1 flex items-center inline-flex w-fit">
+      <Badge className={`${cls} font-bold border-none px-3 py-1 flex items-center inline-flex w-fit`}>
         {icon}
         {label}
       </Badge>
@@ -303,7 +305,14 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
                     {new Date(inv.issue_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
                   </TableCell>
                   <TableCell className="font-black text-slate-900 lg:text-base">
-                    {inv.total_ttc.toLocaleString('fr-FR')} FCFA
+                    <div className="flex flex-col">
+                      <span>{(inv.total_ttc || 0).toLocaleString('fr-FR')} FCFA</span>
+                      {(inv.advance_amount || 0) > 0 && (
+                        <span className="text-[10px] font-semibold text-amber-700 mt-0.5">
+                          Reste : {((inv.total_ttc || 0) - (inv.advance_amount || 0)).toLocaleString('fr-FR')} FCFA
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     {getStatusBadge(inv.status)}
@@ -355,6 +364,15 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
                             <MessageSquare size={16} className="mr-3 text-emerald-600" /> Relancer par WhatsApp
                           </DropdownMenuItem>
                           
+                          {inv.status !== 'paid' && inv.status !== 'partial' && (inv.advance_amount || 0) === 0 && (
+                            <DropdownMenuItem
+                              className="rounded-xl px-3 py-2.5 cursor-pointer text-amber-700 font-bold"
+                              onClick={() => updateInvoiceStatus(inv.id, 'partial')}
+                            >
+                              <Clock size={16} className="mr-3" /> Marquer partielle
+                            </DropdownMenuItem>
+                          )}
+
                           {inv.status !== 'paid' && (
                             <DropdownMenuItem
                               className="rounded-xl px-3 py-2.5 cursor-pointer text-emerald-600 font-bold"

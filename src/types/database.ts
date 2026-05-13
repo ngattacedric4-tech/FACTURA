@@ -35,7 +35,8 @@ export interface Product {
 }
 
 export type InvoiceType = 'invoice' | 'estimate';
-export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'canceled' | 'accepted' | 'rejected';
+export type PaymentMethod = 'wave' | 'om' | 'mtn' | 'cash' | 'transfer' | 'check';
+export type InvoiceStatus = 'draft' | 'sent' | 'partial' | 'paid' | 'overdue' | 'canceled' | 'accepted' | 'rejected';
 
 export interface Invoice {
   id: string;
@@ -51,6 +52,11 @@ export interface Invoice {
   subtotal_ht: number;
   total_tva: number;
   total_ttc: number;
+  // Avance reçue à la commande — voir supabase_migration_002.sql
+  advance_amount?: number;
+  advance_date?: string;
+  advance_method?: PaymentMethod | null;
+  advance_reference?: string;
   created_at: string;
 }
 
@@ -69,7 +75,7 @@ export interface Payment {
   id: string;
   invoice_id: string;
   amount: number;
-  method: 'wave' | 'om' | 'mtn' | 'cash' | 'transfer' | 'check';
+  method: PaymentMethod;
   reference?: string;
   payment_date: string;
 }

@@ -229,9 +229,25 @@ export const InvoicePDF = ({ company, client, invoice, items, showBrand = true }
             <Text>Total TVA (18%)</Text>
             <Text>{invoice.total_tva.toLocaleString('fr-FR')} FCFA</Text>
           </View>
+          <View style={styles.totalRow}>
+            <Text style={{ fontWeight: 'bold' }}>Total TTC</Text>
+            <Text style={{ fontWeight: 'bold' }}>{invoice.total_ttc.toLocaleString('fr-FR')} FCFA</Text>
+          </View>
+          {(invoice.advance_amount ?? 0) > 0 && (
+            <View style={[styles.totalRow, { color: '#059669' }]}>
+              <Text>
+                Avance reçue{invoice.advance_date ? ` (${new Date(invoice.advance_date).toLocaleDateString('fr-FR')})` : ''}
+              </Text>
+              <Text>− {(invoice.advance_amount || 0).toLocaleString('fr-FR')} FCFA</Text>
+            </View>
+          )}
           <View style={styles.grandTotalRow}>
-            <Text style={styles.grandTotalLabel}>TOTAL TTC</Text>
-            <Text style={styles.grandTotalValue}>{invoice.total_ttc.toLocaleString('fr-FR')} FCFA</Text>
+            <Text style={styles.grandTotalLabel}>
+              {(invoice.advance_amount ?? 0) > 0 ? 'RESTE À PAYER' : 'TOTAL TTC'}
+            </Text>
+            <Text style={styles.grandTotalValue}>
+              {((invoice.total_ttc || 0) - (invoice.advance_amount || 0)).toLocaleString('fr-FR')} FCFA
+            </Text>
           </View>
         </View>
 
