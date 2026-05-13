@@ -89,12 +89,13 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
         .select('*, clients(*), invoice_items(*)')
         .eq('company_id', company?.id)
         .eq('type', filterType)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(500);
 
       if (error) throw error;
       setInvoices(data || []);
     } catch (error: any) {
-      console.log('Fetch error:', error.message);
+      console.error('Fetch error:', error.message);
     } finally {
       setLoading(false);
     }
@@ -142,7 +143,7 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
     const message = encodeURIComponent(
       `Bonjour ${inv.clients?.name || ''},\n\nVeuillez trouver ci-joint votre ${docType} N°${inv.number} d'un montant de ${(inv.total_ttc||0).toLocaleString('fr-FR')} FCFA.\nÉchéance : ${dueStr}\n\nCordialement,\n${company?.name || ''}`
     );
-    window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
+    window.open(`https://wa.me/${phone}?text=${message}`, '_blank', 'noopener,noreferrer');
   }
 
   function openPayDialog(inv: any) {

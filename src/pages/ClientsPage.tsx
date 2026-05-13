@@ -44,7 +44,8 @@ export function ClientsPage({ onNavigate }: ClientsPageProps) {
         .from('clients')
         .select('*')
         .eq('company_id', company.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(500);
       if (error) throw error;
       setClients(data || []);
     } catch (e: any) {

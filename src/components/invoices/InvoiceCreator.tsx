@@ -158,7 +158,7 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
     const message = encodeURIComponent(
       `Bonjour ${client.name},\n\nVeuillez trouver ci-joint votre ${docType} N°${invoiceNumber} d'un montant de ${calculateTotal().toLocaleString('fr-FR')} FCFA.\nÉchéance : ${dueStr}\n\nCordialement,\n${company?.name || ''}`
     );
-    window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
+    window.open(`https://wa.me/${phone}?text=${message}`, '_blank', 'noopener,noreferrer');
   }
 
   const handleSave = async () => {

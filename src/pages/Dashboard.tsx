@@ -23,7 +23,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   async function fetchAll() {
     try {
       const [{ data: invoices }, { count: clientsCount }] = await Promise.all([
-        supabase.from('invoices').select('*, clients(name)').eq('company_id', company?.id).order('created_at', { ascending: false }),
+        supabase.from('invoices').select('*, clients(name)').eq('company_id', company?.id).order('created_at', { ascending: false }).limit(500),
         supabase.from('clients').select('*', { count: 'exact', head: true }).eq('company_id', company?.id)
       ]);
       if (invoices) {

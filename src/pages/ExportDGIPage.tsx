@@ -31,14 +31,15 @@ export function ExportDGIPage({ onNavigate }: ExportDGIPageProps) {
 
       const { data: invoices } = await supabase
         .from('invoices')
-        .select('*, clients(name, ncc)')
+        .select('*, clients(name, tax_id)')
         .eq('company_id', company?.id)
         .eq('type', 'invoice')
         .neq('status', 'draft')
         .neq('status', 'canceled')
         .gte('issue_date', startDate)
         .lte('issue_date', endDate)
-        .order('issue_date', { ascending: true });
+        .order('issue_date', { ascending: true })
+        .limit(2000);
 
       if (invoices) {
         setAllInvoices(invoices);
@@ -60,7 +61,7 @@ export function ExportDGIPage({ onNavigate }: ExportDGIPageProps) {
       inv.number,
       new Date(inv.issue_date).toLocaleDateString('fr-FR'),
       (inv.clients as any)?.name || '',
-      (inv.clients as any)?.ncc || '',
+      (inv.clients as any)?.tax_id || '',
       inv.subtotal_ht || 0,
       inv.total_tva || 0,
       inv.total_ttc || 0,
@@ -76,7 +77,7 @@ export function ExportDGIPage({ onNavigate }: ExportDGIPageProps) {
     const rows = allInvoices.map((inv,i) => [
       i+1, new Date(inv.issue_date).toLocaleDateString('fr-FR'),
       inv.due_date ? new Date(inv.due_date).toLocaleDateString('fr-FR') : '',
-      inv.number, (inv.clients as any)?.name || '', (inv.clients as any)?.ncc || '',
+      inv.number, (inv.clients as any)?.name || '', (inv.clients as any)?.tax_id || '',
       inv.subtotal_ht||0, inv.total_tva||0, inv.total_ttc||0, inv.status,
     ]);
     const csv = "data:text/csv;charset=utf-8,\uFEFF" + headers.join(';') + '\n' + rows.map(r=>r.join(';')).join('\n');

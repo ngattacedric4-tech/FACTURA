@@ -169,6 +169,7 @@ export const InvoicePDF = ({ company, client, invoice, items, showBrand = true }
             <Text style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 4 }}>{client.name}</Text>
             <Text>{client.address}</Text>
             <Text>{client.phone}</Text>
+            {client.tax_id && <Text>NCC: {client.tax_id}</Text>}
           </View>
         </View>
 

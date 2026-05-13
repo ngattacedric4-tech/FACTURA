@@ -501,7 +501,7 @@ export function AdminPage() {
               <div className="bg-white rounded-2xl border border-[#F3F4F6] shadow-sm p-6">
                 <h2 className="text-[14px] font-bold text-[#0A0A0A] mb-6">Répartition par plan</h2>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {Object.entries(stats.planBreakdown).map(([plan, count]) => (
+                  {(Object.entries(stats.planBreakdown) as [string, number][]).map(([plan, count]) => (
                     <div key={plan} className="p-5 bg-[#F9FAFB] rounded-xl">
                       <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full ${PLAN_COLORS[plan]}`}>
                         {PLAN_LABEL[plan as keyof typeof PLAN_LABEL] || plan}

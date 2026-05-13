@@ -36,7 +36,7 @@ export function ProductsPage({ onNavigate }: ProductsPageProps) {
     if (!company) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('products').select('*').eq('company_id', company.id).order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('products').select('*').eq('company_id', company.id).order('created_at', { ascending: false }).limit(500);
       if (error) throw error;
       setProducts(data || []);
     } catch(e:any) { console.error(e.message); }

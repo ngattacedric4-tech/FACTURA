@@ -40,7 +40,8 @@ export function PaymentsPage({ onNavigate }: PaymentsPageProps) {
       const { data: invoices } = await supabase
         .from('invoices')
         .select('id, number, clients(name)')
-        .eq('company_id', company?.id);
+        .eq('company_id', company?.id)
+        .limit(1000);
 
       if (!invoices || invoices.length === 0) { setLoading(false); return; }
 
@@ -54,7 +55,8 @@ export function PaymentsPage({ onNavigate }: PaymentsPageProps) {
         .from('payments')
         .select('*')
         .in('invoice_id', invoiceIds)
-        .order('payment_date', { ascending: false });
+        .order('payment_date', { ascending: false })
+        .limit(1000);
 
       if (pays) {
         const enriched = pays.map(p => ({
