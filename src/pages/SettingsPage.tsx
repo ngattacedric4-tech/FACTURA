@@ -489,19 +489,23 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
             )}
           </div>
 
-          {/* Assistant IA — info */}
+          {/* Sauvegarde quotidienne (Pro+) */}
           <div className="bg-gradient-to-br from-[#111827] to-[#1F2937] rounded-2xl p-6 text-white">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-9 h-9 bg-white/10 rounded-xl flex items-center justify-center">
-                <Zap size={16} className="text-white" />
+              <div className="w-9 h-9 bg-emerald-500/20 rounded-xl flex items-center justify-center">
+                <Shield size={16} className="text-emerald-400" />
               </div>
               <div>
-                <p className="text-[14px] font-bold">Assistant IA FACTURAI</p>
-                <p className="text-[12px] text-white/60">Disponible dès le plan Pro</p>
+                <p className="text-[14px] font-bold">Sauvegarde automatique</p>
+                <p className="text-[12px] text-white/60">
+                  {plan === 'starter' ? 'Historique limité à 30 jours' : 'Quotidienne · rétention 30 jours · plan Pro+'}
+                </p>
               </div>
             </div>
             <p className="text-[13px] text-white/70 leading-relaxed">
-              L'assistant IA est accessible via le bouton <span className="font-semibold text-white">✦</span> en bas à droite de toutes les pages. Il connaît vos données en temps réel et vous aide avec la comptabilité, la fiscalité ivoirienne, la rédaction d'emails clients et l'analyse financière.
+              {plan === 'starter'
+                ? 'Sur le plan Gratuit, les factures de plus de 30 jours sont automatiquement archivées. Passez à Pro pour un historique illimité et une sauvegarde quotidienne complète.'
+                : 'Vos données (factures, devis, clients, paiements) sont sauvegardées chaque nuit sur un stockage chiffré redondant (AWS Paris). En cas de problème, restauration sous 24h via support.'}
             </p>
             {plan === 'starter' && (
               <button onClick={() => onNavigate('pricing')}

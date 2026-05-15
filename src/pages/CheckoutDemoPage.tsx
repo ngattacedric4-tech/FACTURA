@@ -59,10 +59,16 @@ export function CheckoutDemoPage({ plan, planName, price, onCancel, onSuccess }:
     setError('');
     setStep('processing');
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('simulate-payment', {
-        body: { plan },
+      const { data, error: fnError } = await supabase.functions.invoke('process-payment', {
+        body: { plan, method, phone, return_url: window.location.origin + '/#pricing' },
       });
       if (fnError || data?.error) throw new Error(data?.error || fnError?.message);
+
+      if (data?.wave_launch_url) {
+        window.location.href = data.wave_launch_url;
+        return;
+      }
+
       setTimeout(() => onSuccess(), 1400);
     } catch (e: any) {
       setStep('otp');

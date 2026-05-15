@@ -95,9 +95,7 @@ export function AdminPage() {
   useEffect(() => { if (tab === 'users'    && isAdmin) fetchCompanies(); },  [tab, isAdmin]);
   useEffect(() => { if (tab === 'leads'    && isAdmin) fetchLeads(); },      [tab, isAdmin]);
   useEffect(() => { if (tab === 'activity' && isAdmin) fetchActivity(); },   [tab, isAdmin]);
-  useEffect(() => {
-    if (tab === 'settings' && isAdmin) { fetchAdmins(); fetchAiConfig(); }
-  }, [tab, isAdmin]);
+  useEffect(() => { if (tab === 'settings' && isAdmin) fetchAdmins(); }, [tab, isAdmin]);
 
   async function fetchStats() {
     setLoadingStats(true);
@@ -755,8 +753,8 @@ export function AdminPage() {
           {tab === 'settings' && (
             <div className="space-y-6">
 
-              {/* Configuration IA */}
-              {(() => {
+              {/* Configuration IA — RETIRÉE */}
+              {false && (() => {
                 const PROVIDERS = [
                   { id: 'deepseek',  label: 'DeepSeek',  hint: 'api.deepseek.com' },
                   { id: 'openai',    label: 'OpenAI',    hint: 'api.openai.com' },

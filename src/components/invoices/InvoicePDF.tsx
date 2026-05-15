@@ -149,8 +149,25 @@ interface InvoicePDFProps {
   showBrand?: boolean;
 }
 
+const TYPE_TITLES: Record<string, string> = {
+  invoice: 'FACTURE',
+  estimate: 'DEVIS',
+  purchase_order: 'BON DE COMMANDE',
+  delivery_note: 'BON DE LIVRAISON',
+  credit_note: 'AVOIR',
+};
+
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  XOF: 'FCFA',
+  EUR: 'EUR',
+  USD: 'USD',
+};
+
 export const InvoicePDF = ({ company, client, invoice, items, showBrand = true }: InvoicePDFProps) => {
   const isInvoice = invoice.type === 'invoice';
+  const title = TYPE_TITLES[invoice.type] ?? 'DOCUMENT';
+  const currencyLabel = CURRENCY_SYMBOLS[invoice.currency ?? 'XOF'] ?? 'FCFA';
+  const showFinancials = invoice.type !== 'delivery_note'; // BL = pas de montants
 
   return (
     <Document>
@@ -165,14 +182,16 @@ export const InvoicePDF = ({ company, client, invoice, items, showBrand = true }
             <Text>NCC: {company.ncc}</Text>
           </View>
           <View style={styles.clientInfo}>
-            <Text style={styles.metaLabel}>Facturé à :</Text>
+            <Text style={styles.metaLabel}>
+              {invoice.type === 'purchase_order' ? 'Fournisseur :' : invoice.type === 'delivery_note' ? 'Livré à :' : 'Facturé à :'}
+            </Text>
             <Text style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 4 }}>{client.name}</Text>
             <Text>{client.address}</Text>
             <Text>{client.phone}</Text>
           </View>
         </View>
 
-        <Text style={styles.documentTitle}>{isInvoice ? 'FACTURE' : 'DEVIS'}</Text>
+        <Text style={styles.documentTitle}>{title}</Text>
 
         {/* Meta Info */}
         <View style={styles.metaSection}>
@@ -219,21 +238,23 @@ export const InvoicePDF = ({ company, client, invoice, items, showBrand = true }
           ))}
         </View>
 
-        {/* Totals */}
-        <View style={styles.totalsSection}>
-          <View style={styles.totalRow}>
-            <Text>Total Hors Taxes</Text>
-            <Text>{invoice.subtotal_ht.toLocaleString('fr-FR')} FCFA</Text>
+        {/* Totals (cachés pour les bons de livraison) */}
+        {showFinancials && (
+          <View style={styles.totalsSection}>
+            <View style={styles.totalRow}>
+              <Text>Total Hors Taxes</Text>
+              <Text>{invoice.subtotal_ht.toLocaleString('fr-FR')} {currencyLabel}</Text>
+            </View>
+            <View style={styles.totalRow}>
+              <Text>Total TVA (18%)</Text>
+              <Text>{invoice.total_tva.toLocaleString('fr-FR')} {currencyLabel}</Text>
+            </View>
+            <View style={styles.grandTotalRow}>
+              <Text style={styles.grandTotalLabel}>{invoice.type === 'credit_note' ? 'TOTAL AVOIR' : 'TOTAL TTC'}</Text>
+              <Text style={styles.grandTotalValue}>{invoice.total_ttc.toLocaleString('fr-FR')} {currencyLabel}</Text>
+            </View>
           </View>
-          <View style={styles.totalRow}>
-            <Text>Total TVA (18%)</Text>
-            <Text>{invoice.total_tva.toLocaleString('fr-FR')} FCFA</Text>
-          </View>
-          <View style={styles.grandTotalRow}>
-            <Text style={styles.grandTotalLabel}>TOTAL TTC</Text>
-            <Text style={styles.grandTotalValue}>{invoice.total_ttc.toLocaleString('fr-FR')} FCFA</Text>
-          </View>
-        </View>
+        )}
 
         {invoice.notes && (
           <View style={{ marginTop: 40 }}>

@@ -46,6 +46,8 @@ import { InvoicePreviewModal } from '@/components/invoices/InvoicePreviewModal';
 import { toast } from 'sonner';
 import { usePlan } from '@/hooks/usePlan';
 import { PLAN_LABEL } from '@/lib/plans';
+import { DOC_TYPE_META } from '@/lib/documentTypes';
+import { InvoiceType } from '@/types/database';
 
 interface InvoicesPageProps {
   onNavigate: (page: string) => void;
@@ -56,7 +58,8 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
   const { plan, limits, usage, canCreate, refresh: refreshPlan } = usePlan();
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterType, setFilterType] = useState<'invoice' | 'estimate'>('invoice');
+  const [filterType, setFilterType] = useState<InvoiceType>('invoice');
+  const isBusiness = plan === 'business' || plan === 'enterprise';
   const [isCreating, setIsCreating] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<any>(null);
   const [search, setSearch] = useState('');
@@ -86,13 +89,17 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
     try {
       const { data, error } = await supabase
         .from('invoices')
-        .select('*, clients(*), invoice_items(*)')
+        .select('*, clients(*), invoice_items(*), payments(amount)')
         .eq('company_id', company?.id)
         .eq('type', filterType)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setInvoices(data || []);
+      const enriched = (data || []).map((inv: any) => {
+        const paid = (inv.payments || []).reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
+        return { ...inv, amount_paid: paid, amount_due: Math.max((inv.total_ttc || 0) - paid, 0) };
+      });
+      setInvoices(enriched);
     } catch (error: any) {
       console.log('Fetch error:', error.message);
     } finally {
@@ -147,7 +154,8 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
 
   function openPayDialog(inv: any) {
     setPayingInvoice(inv);
-    setPayAmount(String(inv.total_ttc || ''));
+    const remaining = inv.amount_due ?? inv.total_ttc ?? 0;
+    setPayAmount(String(remaining || ''));
     setPayMethod('wave');
     setPayRef('');
     setPayDate(new Date().toISOString().slice(0,10));
@@ -160,6 +168,12 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
     try {
       const amount = parseFloat(payAmount);
       if (!amount || amount <= 0) throw new Error('Montant invalide');
+      const total = Number(payingInvoice.total_ttc || 0);
+      const alreadyPaid = Number(payingInvoice.amount_paid || 0);
+      const newPaid = alreadyPaid + amount;
+      if (newPaid > total + 0.01) {
+        throw new Error(`Montant dépasse le solde restant (${(total - alreadyPaid).toLocaleString('fr-FR')} FCFA)`);
+      }
       const { error: pErr } = await supabase.from('payments').insert({
         invoice_id: payingInvoice.id,
         amount,
@@ -168,9 +182,13 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
         payment_date: new Date(payDate).toISOString(),
       });
       if (pErr) throw pErr;
-      const { error: iErr } = await supabase.from('invoices').update({ status: 'paid', updated_at: new Date().toISOString() }).eq('id', payingInvoice.id);
-      if (iErr) throw iErr;
-      toast.success('Paiement enregistré.');
+      // Le trigger SQL recompute_invoice_status met à jour le statut automatiquement.
+      // Fallback côté client si le trigger n'est pas encore déployé :
+      const newStatus = newPaid >= total ? 'paid' : 'partial';
+      await supabase.from('invoices')
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', payingInvoice.id);
+      toast.success(newStatus === 'paid' ? 'Facture soldée !' : `Acompte enregistré (${amount.toLocaleString('fr-FR')} FCFA).`);
       setPayingInvoice(null);
       fetchInvoices();
     } catch(e:any) {
@@ -208,17 +226,19 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
   const getStatusBadge = (status: string) => {
     let label = status;
     let icon = null;
+    let cls = 'bg-[#F3F4F6] text-[#111827] hover:bg-[#E5E7EB]';
     switch (status) {
-      case 'paid': label = 'Payée'; icon = <CheckCircle2 size={12} className="mr-1" />; break;
-      case 'overdue': label = 'En retard'; icon = <AlertCircle size={12} className="mr-1" />; break;
+      case 'paid': label = 'Payée'; icon = <CheckCircle2 size={12} className="mr-1" />; cls = 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'; break;
+      case 'partial': label = 'Acompte'; icon = <Clock size={12} className="mr-1" />; cls = 'bg-amber-50 text-amber-700 hover:bg-amber-100'; break;
+      case 'overdue': label = 'En retard'; icon = <AlertCircle size={12} className="mr-1" />; cls = 'bg-red-50 text-red-700 hover:bg-red-100'; break;
       case 'sent': label = 'Envoyée'; icon = <Send size={12} className="mr-1" />; break;
       case 'draft': label = 'Brouillon'; break;
       case 'canceled': label = 'Annulée'; break;
-      case 'accepted': label = 'Accepté'; icon = <CheckCircle2 size={12} className="mr-1" />; break;
+      case 'accepted': label = 'Accepté'; icon = <CheckCircle2 size={12} className="mr-1" />; cls = 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'; break;
       case 'rejected': label = 'Refusé'; break;
     }
     return (
-      <Badge className="bg-[#F3F4F6] text-[#111827] hover:bg-[#E5E7EB] font-bold border-none px-3 py-1 flex items-center inline-flex w-fit">
+      <Badge className={`${cls} font-bold border-none px-3 py-1 flex items-center inline-flex w-fit`}>
         {icon}
         {label}
       </Badge>
@@ -228,10 +248,15 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <Tabs defaultValue="invoice" onValueChange={(v) => setFilterType(v as any)} className="w-[400px]">
-          <TabsList className="grid grid-cols-2 p-1 bg-[#F8F9FA] rounded-xl h-12 border border-[#E5E7EB]">
-            <TabsTrigger value="invoice" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0A0A0A] data-[state=active]:shadow-sm transition-all font-medium text-[#6B7280]">Factures</TabsTrigger>
-            <TabsTrigger value="estimate" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0A0A0A] data-[state=active]:shadow-sm transition-all font-medium text-[#6B7280]">Devis</TabsTrigger>
+        <Tabs defaultValue="invoice" onValueChange={(v) => setFilterType(v as InvoiceType)} className={isBusiness ? 'w-full max-w-[680px]' : 'w-[400px]'}>
+          <TabsList className={`grid p-1 bg-[#F8F9FA] rounded-xl h-12 border border-[#E5E7EB] ${isBusiness ? 'grid-cols-5' : 'grid-cols-2'}`}>
+            <TabsTrigger value="invoice"        className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0A0A0A] data-[state=active]:shadow-sm transition-all font-medium text-[#6B7280]">Factures</TabsTrigger>
+            <TabsTrigger value="estimate"       className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0A0A0A] data-[state=active]:shadow-sm transition-all font-medium text-[#6B7280]">Devis</TabsTrigger>
+            {isBusiness && <>
+              <TabsTrigger value="purchase_order" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0A0A0A] data-[state=active]:shadow-sm transition-all font-medium text-[#6B7280]">B. Commande</TabsTrigger>
+              <TabsTrigger value="delivery_note"  className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0A0A0A] data-[state=active]:shadow-sm transition-all font-medium text-[#6B7280]">B. Livraison</TabsTrigger>
+              <TabsTrigger value="credit_note"    className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0A0A0A] data-[state=active]:shadow-sm transition-all font-medium text-[#6B7280]">Avoirs</TabsTrigger>
+            </>}
           </TabsList>
         </Tabs>
         
@@ -242,7 +267,8 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
         <Button
           className="rounded-xl font-medium bg-[#111827] hover:bg-[#1F2937] text-white transition-all h-11 px-6"
           onClick={() => {
-            if (!canCreate(filterType)) {
+            const isMetered = filterType === 'invoice' || filterType === 'estimate';
+            if (isMetered && !canCreate(filterType as 'invoice' | 'estimate')) {
               toast.error(`Limite plan ${PLAN_LABEL[plan]} atteinte (${filterType==='invoice'?usage.invoicesThisMonth+'/'+limits.invoicesPerMonth+' factures':usage.estimatesThisMonth+'/'+limits.estimatesPerMonth+' devis'} ce mois). Passez à Pro.`);
               onNavigate('pricing');
               return;
@@ -251,7 +277,7 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
           }}
         >
           <Plus size={18} className="mr-2" />
-          {filterType === 'invoice' ? 'Nouvelle facture' : 'Nouveau devis'}
+          Nouveau {DOC_TYPE_META[filterType].numberWord.toLowerCase()}
         </Button>
       </div>
 
@@ -284,7 +310,7 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
                     <div className="space-y-1">
                       <p className="font-bold text-slate-900 text-lg">Aucun document pour le moment</p>
                       <p className="text-sm text-slate-500 max-w-sm mx-auto">
-                        Créez votre première {filterType === 'invoice' ? 'facture' : 'devis'} professionnelle et envoyez-la à votre client.
+                        Créez votre premier {DOC_TYPE_META[filterType].numberWord.toLowerCase()} et envoyez-le à votre client.
                       </p>
                     </div>
                   </div>
@@ -304,6 +330,11 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
                   </TableCell>
                   <TableCell className="font-black text-slate-900 lg:text-base">
                     {inv.total_ttc.toLocaleString('fr-FR')} FCFA
+                    {inv.amount_paid > 0 && inv.amount_due > 0 && (
+                      <div className="text-[11px] font-medium text-amber-700 mt-0.5">
+                        Reste {inv.amount_due.toLocaleString('fr-FR')} FCFA
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell>
                     {getStatusBadge(inv.status)}
@@ -360,7 +391,8 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
                               className="rounded-xl px-3 py-2.5 cursor-pointer text-emerald-600 font-bold"
                               onClick={() => openPayDialog(inv)}
                             >
-                              <CheckCircle2 size={16} className="mr-3" /> Marquer comme payée
+                              <CheckCircle2 size={16} className="mr-3" />
+                              {inv.status === 'partial' ? 'Encaisser solde / acompte' : 'Encaisser paiement / acompte'}
                             </DropdownMenuItem>
                           )}
 
@@ -426,12 +458,20 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
       <Dialog open={!!payingInvoice} onOpenChange={(o)=>{ if(!o) setPayingInvoice(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Enregistrer un paiement</DialogTitle>
+            <DialogTitle>Enregistrer un paiement / acompte</DialogTitle>
           </DialogHeader>
+          {payingInvoice && (
+            <div className="bg-[#F9FAFB] rounded-xl p-4 space-y-1.5 text-[12px]">
+              <div className="flex justify-between"><span className="text-[#6B7280]">Total facture</span><span className="font-mono font-bold text-[#111827]">{Number(payingInvoice.total_ttc||0).toLocaleString('fr-FR')} FCFA</span></div>
+              <div className="flex justify-between"><span className="text-[#6B7280]">Déjà payé</span><span className="font-mono text-emerald-700">{Number(payingInvoice.amount_paid||0).toLocaleString('fr-FR')} FCFA</span></div>
+              <div className="flex justify-between border-t border-[#E5E7EB] pt-1.5 mt-1.5"><span className="font-semibold text-[#111827]">Solde restant</span><span className="font-mono font-bold text-amber-700">{Number(payingInvoice.amount_due ?? payingInvoice.total_ttc ?? 0).toLocaleString('fr-FR')} FCFA</span></div>
+            </div>
+          )}
           <form onSubmit={handlePaySubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label>Montant (FCFA)</Label>
-              <Input type="number" step="1" required value={payAmount} onChange={e=>setPayAmount(e.target.value)} />
+              <Label>Montant à encaisser (FCFA)</Label>
+              <Input type="number" step="1" required value={payAmount} onChange={e=>setPayAmount(e.target.value)} placeholder="Saisissez un acompte ou le solde complet" />
+              <p className="text-[11px] text-[#9CA3AF]">Pré-rempli avec le solde restant. Modifiez librement pour enregistrer un acompte.</p>
             </div>
             <div className="space-y-2">
               <Label>Méthode de paiement</Label>

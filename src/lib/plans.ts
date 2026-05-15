@@ -5,15 +5,20 @@ export interface PlanLimits {
   estimatesPerMonth: number;
   clients: number;
   products: number;
-  pdfBrand: boolean;        // peut retirer le watermark FACTURA
+  pdfBrand: boolean;             // peut retirer le watermark FACTURA
   dgiExport: boolean;
   multiUser: number;
   multiCompany: boolean;
   sso: boolean;
-  apiAccess: boolean;
-  historyDays: number;      // -1 = illimité
-  aiWhatsappAgent: boolean; // agent IA qui répond aux clients via WhatsApp
-  aiInsights: boolean;      // analyses prédictives (impayés, opportunités)
+  apiAccess: boolean;            // API REST + webhooks
+  historyDays: number;           // -1 = illimité
+  emailReminders: boolean;       // relances email auto J+3/7/15
+  whatsappReminders: boolean;    // relances WhatsApp auto
+  recurringInvoices: boolean;    // factures récurrentes
+  multiCurrency: boolean;        // EUR/USD en plus du XOF
+  advancedDocuments: boolean;    // BC, BL, avoirs
+  accountingExports: boolean;    // Sage, Excel
+  auditLog: boolean;             // journal d'audit complet
 }
 
 const INF = Number.POSITIVE_INFINITY;
@@ -25,7 +30,9 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     pdfBrand: false, dgiExport: false,
     multiUser: 1, multiCompany: false, sso: false, apiAccess: false,
     historyDays: 30,
-    aiWhatsappAgent: false, aiInsights: false,
+    emailReminders: false, whatsappReminders: false,
+    recurringInvoices: false, multiCurrency: false,
+    advancedDocuments: false, accountingExports: false, auditLog: false,
   },
   pro: {
     invoicesPerMonth: INF, estimatesPerMonth: INF,
@@ -33,15 +40,19 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     pdfBrand: true, dgiExport: true,
     multiUser: 1, multiCompany: false, sso: false, apiAccess: false,
     historyDays: -1,
-    aiWhatsappAgent: false, aiInsights: false,
+    emailReminders: true, whatsappReminders: false,
+    recurringInvoices: false, multiCurrency: false,
+    advancedDocuments: false, accountingExports: false, auditLog: false,
   },
   business: {
     invoicesPerMonth: INF, estimatesPerMonth: INF,
     clients: INF, products: INF,
     pdfBrand: true, dgiExport: true,
-    multiUser: 5, multiCompany: false, sso: false, apiAccess: false,
+    multiUser: 5, multiCompany: false, sso: false, apiAccess: true,
     historyDays: -1,
-    aiWhatsappAgent: true, aiInsights: true,
+    emailReminders: true, whatsappReminders: true,
+    recurringInvoices: true, multiCurrency: true,
+    advancedDocuments: true, accountingExports: true, auditLog: false,
   },
   enterprise: {
     invoicesPerMonth: INF, estimatesPerMonth: INF,
@@ -49,7 +60,9 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     pdfBrand: true, dgiExport: true,
     multiUser: INF, multiCompany: true, sso: true, apiAccess: true,
     historyDays: -1,
-    aiWhatsappAgent: true, aiInsights: true,
+    emailReminders: true, whatsappReminders: true,
+    recurringInvoices: true, multiCurrency: true,
+    advancedDocuments: true, accountingExports: true, auditLog: true,
   },
 };
 

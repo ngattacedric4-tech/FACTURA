@@ -34,8 +34,9 @@ export interface Product {
   tva_rate: number;
 }
 
-export type InvoiceType = 'invoice' | 'estimate';
-export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'canceled' | 'accepted' | 'rejected';
+export type InvoiceType = 'invoice' | 'estimate' | 'purchase_order' | 'delivery_note' | 'credit_note';
+export type InvoiceStatus = 'draft' | 'sent' | 'partial' | 'paid' | 'overdue' | 'canceled' | 'accepted' | 'rejected';
+export type Currency = 'XOF' | 'EUR' | 'USD';
 
 export interface Invoice {
   id: string;
@@ -51,6 +52,9 @@ export interface Invoice {
   subtotal_ht: number;
   total_tva: number;
   total_ttc: number;
+  currency?: Currency;
+  exchange_rate?: number;
+  parent_invoice_id?: string;
   created_at: string;
 }
 
@@ -77,7 +81,55 @@ export interface Payment {
 export interface Subscription {
   id: string;
   company_id: string;
-  plan: 'starter' | 'business' | 'pro';
+  plan: 'starter' | 'pro' | 'business' | 'enterprise';
   status: 'active' | 'past_due' | 'canceled';
   current_period_end?: string;
+}
+
+export type TeamRole = 'owner' | 'admin' | 'member' | 'viewer';
+
+export interface TeamMember {
+  id: string;
+  company_id: string;
+  user_id: string | null;
+  role: TeamRole;
+  invited_email: string | null;
+  invited_at: string;
+  accepted_at: string | null;
+  invite_token: string | null;
+  invited_by: string | null;
+  created_at: string;
+}
+
+export interface AuditLog {
+  id: string;
+  company_id: string | null;
+  user_id: string | null;
+  action: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  before_data: any;
+  after_data: any;
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: string;
+}
+
+export interface ApiKey {
+  id: string;
+  company_id: string;
+  name: string;
+  key_prefix: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+}
+
+export interface Webhook {
+  id: string;
+  company_id: string;
+  url: string;
+  events: string[];
+  active: boolean;
+  created_at: string;
 }
