@@ -16,6 +16,9 @@ import {
   ChevronRight,
   Sparkles,
   Crown,
+  UserCog,
+  Code2,
+  History,
 } from 'lucide-react';
 import { usePlan } from '@/hooks/usePlan';
 import { PLAN_LABEL } from '@/lib/plans';
@@ -40,6 +43,9 @@ export function MainLayout({ children, onNavigate, currentPage }: MainLayoutProp
     localStorage.setItem('sidebar-collapsed', collapsed.toString());
   }, [collapsed]);
 
+  const isBusiness = plan === 'business' || plan === 'enterprise';
+  const isEnterprise = plan === 'enterprise';
+
   const navigation = [
     { name: 'Tableau de bord', icon: LayoutDashboard, id: 'dashboard' },
     { name: 'Clients', icon: Users, id: 'clients' },
@@ -47,6 +53,13 @@ export function MainLayout({ children, onNavigate, currentPage }: MainLayoutProp
     { name: 'Factures & Devis', icon: ReceiptText, id: 'invoices' },
     { name: 'Paiements', icon: CreditCard, id: 'payments' },
     { name: 'Export DGI', icon: FileSpreadsheet, id: 'export-dgi' },
+    ...(isBusiness ? [
+      { name: 'Équipe', icon: UserCog, id: 'team' },
+      { name: 'API & Webhooks', icon: Code2, id: 'api' },
+    ] : []),
+    ...(isEnterprise ? [
+      { name: 'Journal d\'audit', icon: History, id: 'audit' },
+    ] : []),
   ];
 
   const handleLogout = async () => {

@@ -31,6 +31,7 @@ import { PDFDownloadLink } from '@react-pdf/renderer';
 import { InvoicePDF } from '@/components/invoices/InvoicePDF';
 import { usePlan } from '@/hooks/usePlan';
 import { toast } from 'sonner';
+import { DOC_TYPE_META, CURRENCIES } from '@/lib/documentTypes';
 
 interface InvoiceLine {
   id: string;
@@ -62,6 +63,13 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
   const [status, setStatus] = useState<string>('draft');
   const [paymentMethod, setPaymentMethod] = useState<string>('');
   const [savedInvoice, setSavedInvoice] = useState<any>(null);
+  const [currency, setCurrency] = useState<'XOF' | 'EUR' | 'USD'>(existingInvoice?.currency ?? 'XOF');
+
+  // Acompte / avance à l'émission
+  const [advanceAmount, setAdvanceAmount] = useState<string>(existingInvoice?.advance_amount ? String(existingInvoice.advance_amount) : '');
+  const [advanceMethod, setAdvanceMethod] = useState<string>(existingInvoice?.advance_method ?? 'cash');
+  const [advanceDate, setAdvanceDate] = useState<string>(existingInvoice?.advance_date ?? new Date().toISOString().slice(0, 10));
+  const [advanceReference, setAdvanceReference] = useState<string>(existingInvoice?.advance_reference ?? '');
 
   const [lines, setLines] = useState<InvoiceLine[]>([
     { id: '1', description: '', quantity: 1, unit_price: 0, tva_rate: 18, unit: 'forfait' }
@@ -103,10 +111,19 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
     setProducts(productsRes.data || []);
   }
 
-  function generateTempNumber() {
+  async function generateTempNumber() {
+    if (!company) return;
     const year = new Date().getFullYear();
-    const prefix = type === 'invoice' ? 'FAC' : 'DEV';
-    setInvoiceNumber(`${prefix}-${year}-${Math.floor(1000 + Math.random() * 9000)}`);
+    const prefix = DOC_TYPE_META[type]?.prefix ?? 'FAC';
+    // Aperçu non-réservé (la séquence définitive est calculée à l'enregistrement)
+    const { count } = await supabase
+      .from('invoices')
+      .select('id', { count: 'exact', head: true })
+      .eq('company_id', company.id)
+      .eq('type', type)
+      .gte('issue_date', `${year}-01-01`);
+    const seq = (count ?? 0) + 1;
+    setInvoiceNumber(`${prefix}-${year}-${String(seq).padStart(4, '0')}`);
   }
 
   const addLine = () => {
@@ -191,28 +208,62 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
           subtotal_ht: calculateSubtotal(),
           total_tva: calculateTVA(),
           total_ttc: calculateTotal(),
+          currency,
           updated_at: new Date().toISOString(),
         }).eq('id', existingInvoice.id).select().single();
         if (updErr) throw updErr;
         invoice = data;
         await supabase.from('invoice_items').delete().eq('invoice_id', existingInvoice.id);
       } else {
+        // Numérotation séquentielle atomique côté DB (DGI : pas de trous)
+        const prefix = DOC_TYPE_META[type]?.prefix ?? 'FAC';
+        const { data: numData, error: numErr } = await supabase.rpc('next_document_number', {
+          p_company_id: company?.id,
+          p_doc_type: type,
+          p_prefix: prefix,
+        });
+        const finalNumber = (!numErr && numData) ? (numData as string) : invoiceNumber;
+
+        // Acompte : ajuste statut si applicable
+        const advAmt = parseFloat(advanceAmount) || 0;
+        const ttc = calculateTotal();
+        let initialStatus = status;
+        if (advAmt > 0 && (type === 'invoice' || type === 'purchase_order')) {
+          initialStatus = advAmt >= ttc ? 'paid' : 'partial';
+        }
+
         const { data, error: invError } = await supabase.from('invoices').insert({
           company_id: company?.id,
           client_id: selectedClientId,
           type,
-          number: invoiceNumber,
-          status: status,
+          number: finalNumber,
+          status: initialStatus,
           issue_date: issueDate,
           due_date: dueDateToSave || null,
           notes: finalNotes,
           terms: finalTerms || PAYMENT_TERMS_OPTIONS.find(o => o.value === paymentTerms)?.label,
           subtotal_ht: calculateSubtotal(),
           total_tva: calculateTVA(),
-          total_ttc: calculateTotal(),
+          total_ttc: ttc,
+          currency,
+          advance_amount: advAmt,
+          advance_method: advAmt > 0 ? advanceMethod : null,
+          advance_date: advAmt > 0 ? advanceDate : null,
+          advance_reference: advAmt > 0 ? (advanceReference || null) : null,
         }).select().single();
         if (invError) throw invError;
         invoice = data;
+
+        // Crée un payment correspondant pour traçabilité unifiée
+        if (advAmt > 0) {
+          await supabase.from('payments').insert({
+            invoice_id: invoice.id,
+            amount: advAmt,
+            method: advanceMethod,
+            reference: advanceReference || null,
+            payment_date: new Date(advanceDate).toISOString(),
+          });
+        }
       }
 
       const itemsToInsert = lines.map(l => ({
@@ -257,8 +308,8 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
         </Button>
         <h2 className="text-[20px] font-semibold text-[#0A0A0A]">
           {existingInvoice
-            ? `Modifier ${type === 'invoice' ? 'la facture' : 'le devis'} ${existingInvoice.number}`
-            : type === 'invoice' ? 'Nouvelle Facture' : 'Nouveau Devis'
+            ? `Modifier ${DOC_TYPE_META[type].numberWord} ${existingInvoice.number}`
+            : `Nouveau ${DOC_TYPE_META[type].numberWord}`
           }
         </h2>
         <div className="flex items-center space-x-3">
@@ -302,7 +353,6 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
                       placeholder="Sélectionner un client"
                       options={clients.map(c => ({ value: c.id, label: c.name }))}
                     />
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280] pointer-events-none" size={16} />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -345,7 +395,6 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
                       disabled={!!savedInvoice}
                       options={PAYMENT_TERMS_OPTIONS}
                     />
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280] pointer-events-none" size={16} />
                   </div>
                 </div>
               </div>
@@ -361,6 +410,86 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
                       onChange={(e) => setCustomDueDate(e.target.value)}
                     />
                   </div>
+                </div>
+              )}
+
+              {(limits.multiUser > 1) && (
+                <div className="mb-6 space-y-2">
+                  <Label className="text-[11px] font-bold uppercase tracking-widest text-[#9CA3AF]">Devise</Label>
+                  <CustomSelect
+                    size="lg"
+                    value={currency}
+                    onChange={(v) => setCurrency(v as 'XOF' | 'EUR' | 'USD')}
+                    disabled={!!savedInvoice}
+                    options={Object.entries(CURRENCIES).map(([k, v]) => ({ value: k, label: v.label }))}
+                  />
+                </div>
+              )}
+
+              {/* Acompte / avance à l'émission */}
+              {(type === 'invoice' || type === 'purchase_order') && (
+                <div className="mb-6 bg-[#F9FAFB] rounded-2xl border border-[#E5E7EB] p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[12px] font-bold uppercase tracking-widest text-[#374151]">Acompte / Avance reçue</p>
+                    <span className="text-[11px] text-[#9CA3AF]">Optionnel</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-[11px] font-bold uppercase tracking-widest text-[#9CA3AF]">Montant ({CURRENCIES[currency].symbol})</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="1"
+                        placeholder="0"
+                        className="h-[44px] bg-white border-[#E5E7EB] rounded-xl focus:border-[#111827] focus:ring-1 focus:ring-[#111827]"
+                        value={advanceAmount}
+                        onChange={(e) => setAdvanceAmount(e.target.value)}
+                        disabled={!!savedInvoice}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[11px] font-bold uppercase tracking-widest text-[#9CA3AF]">Mode de paiement</Label>
+                      <CustomSelect
+                        size="lg"
+                        value={advanceMethod}
+                        onChange={setAdvanceMethod}
+                        disabled={!!savedInvoice || !advanceAmount || parseFloat(advanceAmount) <= 0}
+                        options={[
+                          { value: 'cash',     label: 'Espèces' },
+                          { value: 'wave',     label: 'Wave' },
+                          { value: 'om',       label: 'Orange Money' },
+                          { value: 'mtn',      label: 'MTN Money' },
+                          { value: 'transfer', label: 'Virement bancaire' },
+                          { value: 'check',    label: 'Chèque' },
+                        ]}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[11px] font-bold uppercase tracking-widest text-[#9CA3AF]">Date</Label>
+                      <Input
+                        type="date"
+                        className="h-[44px] bg-white border-[#E5E7EB] rounded-xl focus:border-[#111827] focus:ring-1 focus:ring-[#111827]"
+                        value={advanceDate}
+                        onChange={(e) => setAdvanceDate(e.target.value)}
+                        disabled={!!savedInvoice || !advanceAmount || parseFloat(advanceAmount) <= 0}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[11px] font-bold uppercase tracking-widest text-[#9CA3AF]">Référence (optionnel)</Label>
+                      <Input
+                        placeholder="N° transaction"
+                        className="h-[44px] bg-white border-[#E5E7EB] rounded-xl focus:border-[#111827] focus:ring-1 focus:ring-[#111827]"
+                        value={advanceReference}
+                        onChange={(e) => setAdvanceReference(e.target.value)}
+                        disabled={!!savedInvoice || !advanceAmount || parseFloat(advanceAmount) <= 0}
+                      />
+                    </div>
+                  </div>
+                  {advanceAmount && parseFloat(advanceAmount) > 0 && parseFloat(advanceAmount) >= calculateTotal() && (
+                    <p className="text-[11px] text-amber-700 bg-amber-50 px-3 py-2 rounded-lg">
+                      ⚠️ L'acompte couvre le total — la facture sera marquée comme payée.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -430,8 +559,7 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
                               { value: 'metre',   label: 'Mètre' },
                             ]}
                           />
-                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280] pointer-events-none" size={16} />
-                        </div>
+                              </div>
                       </div>
 
                       <div className="w-full md:w-[18%] md:min-w-[150px] relative">
@@ -453,8 +581,7 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
                             disabled={!!savedInvoice}
                             options={TVA_OPTIONS.map(o => ({ value: String(o.value), label: o.label }))}
                           />
-                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280] pointer-events-none" size={16} />
-                        </div>
+                              </div>
                       </div>
 
                       <div className="w-full md:w-[15%] md:min-w-[150px] text-right shrink-0">
@@ -550,7 +677,6 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
                         { value: 'Espèces',          label: 'Espèces' },
                       ]}
                     />
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280] pointer-events-none" size={16} />
                   </div>
                 </div>
               </div>

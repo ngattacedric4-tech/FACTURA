@@ -22,8 +22,10 @@ import { SettingsPage } from './pages/SettingsPage';
 import { PricingPage } from './pages/PricingPage';
 import { LandingPage } from './pages/LandingPage';
 import { AdminPage } from './pages/AdminPage';
-import { AIAssistant } from './components/AIAssistant';
-import { AIAssistantAdmin } from './components/AIAssistantAdmin';
+import { TeamPage } from './pages/TeamPage';
+import { ApiPage } from './pages/ApiPage';
+import { AuditPage } from './pages/AuditPage';
+import { InviteAcceptPage } from './pages/InviteAcceptPage';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 import { ReceiptText } from 'lucide-react';
@@ -35,10 +37,16 @@ interface CheckoutData {
   price: string;
 }
 
-const APP_PAGES = new Set(['dashboard','clients','products','invoices','payments','export-dgi','settings','pricing']);
+const APP_PAGES = new Set(['dashboard','clients','products','invoices','payments','export-dgi','settings','pricing','team','api','audit']);
 
 function readHash() {
   return window.location.hash.replace(/^#\/?/, '');
+}
+
+function readInviteToken(): string | null {
+  const hash = window.location.hash;
+  const match = hash.match(/invite=([a-f0-9-]+)/i);
+  return match ? match[1] : null;
 }
 
 function AppContent() {
@@ -114,6 +122,12 @@ function AppContent() {
     );
   }
 
+  // Acceptation invitation team — fonctionne loggé ou non
+  const inviteToken = readInviteToken();
+  if (inviteToken) {
+    return <InviteAcceptPage token={inviteToken} onDone={() => { window.location.hash = ''; }} />;
+  }
+
   if (!user) {
     if (showAuth) return <AuthPages initialMode={authMode} />;
     return (
@@ -125,7 +139,7 @@ function AppContent() {
   }
 
   // Admin — interface séparée
-  if (isAdmin) return <><AdminPage /><AIAssistantAdmin /></>;
+  if (isAdmin) return <AdminPage />;
 
   if (!company) return <OnboardingPage />;
 
@@ -157,6 +171,9 @@ function AppContent() {
       case 'export-dgi': return <ExportDGIPage onNavigate={navigate} />;
       case 'settings':   return <SettingsPage onNavigate={navigate} />;
       case 'pricing':    return <PricingPage  onNavigate={navigate} onStartCheckout={setCheckoutData} />;
+      case 'team':       return <TeamPage     onNavigate={navigate} />;
+      case 'api':        return <ApiPage      onNavigate={navigate} />;
+      case 'audit':      return <AuditPage    onNavigate={navigate} />;
       default:           return <Dashboard    onNavigate={navigate} />;
     }
   };
@@ -176,7 +193,6 @@ function AppContent() {
           </motion.div>
         </AnimatePresence>
       </MainLayout>
-      <AIAssistant />
     </>
   );
 }

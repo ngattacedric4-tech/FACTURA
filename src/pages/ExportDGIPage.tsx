@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { FileSpreadsheet, Download, Calendar, ShieldCheck } from 'lucide-react';
+import { FileSpreadsheet, Download, Calendar, ShieldCheck, Lock } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { usePlan } from '@/hooks/usePlan';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { CustomSelect } from '@/components/ui/CustomSelect';
@@ -12,6 +13,8 @@ interface TVAStats { baseHT_18: number; tva_18: number; baseHT_0: number; totalT
 
 export function ExportDGIPage({ onNavigate }: ExportDGIPageProps) {
   const { company } = useAuth();
+  const { plan } = usePlan();
+  const isBusiness = plan === 'business' || plan === 'enterprise';
   const [period, setPeriod] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
@@ -83,6 +86,58 @@ export function ExportDGIPage({ onNavigate }: ExportDGIPageProps) {
     const a = document.createElement('a'); a.href = encodeURI(csv);
     a.download = `registre_factures_${period}.csv`; a.click();
     toast.success('Registre des factures généré !');
+  }
+
+  function exportSage() {
+    const headers = ['JournalCode','EcritureDate','EcritureNum','CompteNum','CompteLib','EcritureLib','Debit','Credit','PieceRef','PieceDate'];
+    const rows: any[] = [];
+    allInvoices.forEach((inv, i) => {
+      const date = new Date(inv.issue_date).toISOString().slice(0,10).replace(/-/g,'');
+      const num = String(i+1).padStart(5, '0');
+      const clientName = (inv.clients as any)?.name || '';
+      const lib = `Facture ${inv.number} - ${clientName}`.slice(0,60);
+      rows.push(['VTE', date, num, '411000', clientName.slice(0,40), lib, (inv.total_ttc||0).toFixed(2), '0.00', inv.number, date]);
+      rows.push(['VTE', date, num, '701000', 'Ventes de marchandises', lib, '0.00', (inv.subtotal_ht||0).toFixed(2), inv.number, date]);
+      if ((inv.total_tva||0) > 0) {
+        rows.push(['VTE', date, num, '445710', 'TVA collectee 18%', lib, '0.00', (inv.total_tva||0).toFixed(2), inv.number, date]);
+      }
+    });
+    const csv = "﻿" + headers.join(';') + '\n' + rows.map(r => r.join(';')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url;
+    a.download = `journal_ventes_sage_${period}.csv`; a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Export Sage généré !');
+  }
+
+  function exportExcel() {
+    const esc = (v: string) => String(v).replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'} as any)[c]);
+    const sheet = `<?xml version="1.0"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+ <Worksheet ss:Name="Factures">
+  <Table>
+   <Row>${['N Facture','Date','Client','NCC','HT','TVA','TTC','Statut'].map(h => `<Cell><Data ss:Type="String">${h}</Data></Cell>`).join('')}</Row>
+   ${allInvoices.map(inv => `<Row>
+    <Cell><Data ss:Type="String">${esc(inv.number)}</Data></Cell>
+    <Cell><Data ss:Type="String">${new Date(inv.issue_date).toLocaleDateString('fr-FR')}</Data></Cell>
+    <Cell><Data ss:Type="String">${esc((inv.clients as any)?.name || '')}</Data></Cell>
+    <Cell><Data ss:Type="String">${esc((inv.clients as any)?.ncc || '')}</Data></Cell>
+    <Cell><Data ss:Type="Number">${inv.subtotal_ht || 0}</Data></Cell>
+    <Cell><Data ss:Type="Number">${inv.total_tva || 0}</Data></Cell>
+    <Cell><Data ss:Type="Number">${inv.total_ttc || 0}</Data></Cell>
+    <Cell><Data ss:Type="String">${inv.status}</Data></Cell>
+   </Row>`).join('')}
+  </Table>
+ </Worksheet>
+</Workbook>`;
+    const blob = new Blob([sheet], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url;
+    a.download = `factures_${period}.xls`; a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Export Excel généré !');
   }
 
   const months = Array.from({length: 12}, (_,i) => {
@@ -184,6 +239,58 @@ export function ExportDGIPage({ onNavigate }: ExportDGIPageProps) {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Exports comptables (Business+) */}
+      <div className="bg-white rounded-2xl border border-[#F3F4F6] shadow-sm p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-[15px] font-semibold text-[#0A0A0A]">Exports comptables avancés</h2>
+            <p className="text-[12px] text-[#9CA3AF] mt-0.5">Format Sage 100/Compta · Excel natif</p>
+          </div>
+          {!isBusiness && (
+            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase text-amber-700 bg-amber-50 px-2 py-1 rounded-full">
+              <Lock size={10}/> Business+
+            </span>
+          )}
+        </div>
+        {isBusiness ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Button
+              onClick={exportSage}
+              disabled={allInvoices.length===0}
+              className="bg-[#F9FAFB] hover:bg-[#F3F4F6] text-[#111827] border border-[#E5E7EB] h-12 justify-start px-4"
+            >
+              <FileSpreadsheet size={16} className="mr-2 text-emerald-600"/>
+              <div className="text-left">
+                <div className="text-[13px] font-semibold">Journal Sage</div>
+                <div className="text-[11px] text-[#9CA3AF]">Compte 411/701/445</div>
+              </div>
+              <Download size={14} className="ml-auto"/>
+            </Button>
+            <Button
+              onClick={exportExcel}
+              disabled={allInvoices.length===0}
+              className="bg-[#F9FAFB] hover:bg-[#F3F4F6] text-[#111827] border border-[#E5E7EB] h-12 justify-start px-4"
+            >
+              <FileSpreadsheet size={16} className="mr-2 text-blue-600"/>
+              <div className="text-left">
+                <div className="text-[13px] font-semibold">Excel (.xls)</div>
+                <div className="text-[11px] text-[#9CA3AF]">Format natif Microsoft</div>
+              </div>
+              <Download size={14} className="ml-auto"/>
+            </Button>
+          </div>
+        ) : (
+          <div className="text-center py-6">
+            <p className="text-[13px] text-[#6B7280] mb-3">
+              Exports Sage et Excel disponibles à partir du plan Business.
+            </p>
+            <Button onClick={() => onNavigate('pricing')} className="bg-[#111827] hover:bg-[#1F2937] text-white">
+              Voir les plans
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Mention légale */}

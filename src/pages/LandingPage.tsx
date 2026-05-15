@@ -131,10 +131,10 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
   ];
 
   const plans = [
-    { id: 'starter',    name: 'Gratuit',    price: '0',       period: '/mois',  features: ['5 factures / mois', '3 devis / mois', "Jusqu'à 10 clients", "Jusqu'à 20 produits", 'PDF avec marque FACTURA'], cta: 'Démarrer gratuitement', popular: false, enterprise: false },
-    { id: 'pro',        name: 'Pro',        price: '5 000',   period: '/mois',  features: ['Factures & devis illimités', 'Clients & produits illimités', 'PDF sans marque + logo', 'Export DGI mensuel', 'Support email 48h'], cta: 'Choisir Pro', popular: true, enterprise: false },
-    { id: 'business',   name: 'Business',   price: '15 000',  period: '/mois',  features: ['Tout Pro inclus', '5 utilisateurs', 'Agent IA WhatsApp 24/7', 'Analyses IA prédictives', 'API + webhooks', 'Support prioritaire 24h'], cta: 'Choisir Business', popular: false, enterprise: false },
-    { id: 'enterprise', name: 'Enterprise', price: 'Sur devis', period: '',     features: ['Tout Business inclus', 'Agent IA personnalisé entraîné sur vos données', 'Multi-entreprises', 'Utilisateurs illimités + rôles', 'SSO Google / Microsoft', 'SLA 99.9% + account manager'], cta: 'Contacter le commercial', popular: false, enterprise: true },
+    { id: 'starter',    name: 'Gratuit',    price: '0',       period: '/mois',  features: ['5 factures / mois', '3 devis / mois', "Jusqu'à 10 clients", "Jusqu'à 20 produits", 'PDF avec marque FACTURA', 'Paiement Wave / Orange Money / MTN', 'Historique 30 jours'], cta: 'Démarrer gratuitement', popular: false, enterprise: false },
+    { id: 'pro',        name: 'Pro',        price: '5 000',   period: '/mois',  features: ['Factures & devis illimités', 'Clients & produits illimités', 'PDF sans marque + logo personnalisé', 'Export DGI mensuel automatique', 'Relances email automatiques', 'Tableau de bord avancé', 'Historique illimité', 'Support email 48h'], cta: 'Choisir Pro', popular: true, enterprise: false },
+    { id: 'business',   name: 'Business',   price: '15 000',  period: '/mois',  features: ['Tout Pro inclus', "Jusqu'à 5 utilisateurs + rôles", 'Relances WhatsApp en 1 clic', 'Bons de commande & livraison', 'Factures récurrentes & avoirs', 'Acomptes & paiements partiels', 'Multi-devises (FCFA, EUR, USD)', 'API REST + webhooks'], cta: 'Choisir Business', popular: false, enterprise: false },
+    { id: 'enterprise', name: 'Enterprise', price: 'Sur devis', period: '',     features: ['Tout Business inclus', 'Utilisateurs illimités + rôles personnalisés', 'Intégration via API REST', 'Journal d\'audit complet (RGPD)', 'SLA 99.9% + account manager dédié'], cta: 'Contacter le commercial', popular: false, enterprise: true },
   ];
 
   const testimonials = [
@@ -571,7 +571,8 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
 
       {/* ── MODALS FOOTER ─────────────────────────────────────── */}
       <Dialog open={!!activeModal} onOpenChange={() => setActiveModal(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="top-0 left-0 translate-x-0 translate-y-0 w-screen h-screen max-w-none sm:max-w-none rounded-none p-6 sm:p-12 overflow-y-auto">
+          <div className="max-w-4xl mx-auto w-full pt-6">
           {activeModal === 'documentation' && (
             <div className="space-y-5">
               <h2 className="text-[20px] font-bold text-[#111827]">Documentation</h2>
@@ -596,8 +597,8 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                 <p>Allez dans <strong>Export DGI</strong>, sélectionnez le mois concerné et téléchargez votre registre mensuel conforme à la DGI-CI. À effectuer avant le 15 du mois suivant.</p>
               </ModalSection>
 
-              <ModalSection title="6. Assistant IA (plans Pro & Business)">
-                <p>Cliquez sur le bouton ✨ en bas à droite de l'interface. L'assistant FACTURAI connaît vos données en temps réel et répond à toutes vos questions : comptabilité, relances, fiscalité ivoirienne.</p>
+              <ModalSection title="6. Relances automatiques (plans Pro & Business)">
+                <p>FACTURA envoie des relances email automatiques (J+3, J+7, J+15) pour vos factures impayées. Le plan Business ajoute les relances par WhatsApp pour un meilleur taux de recouvrement.</p>
               </ModalSection>
 
               <div className="pt-2 border-t border-[#F3F4F6]">
@@ -651,7 +652,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                 { q: 'Mes données sont-elles sécurisées ?', a: 'Vos données sont hébergées sur Supabase (infrastructure AWS Paris) avec chiffrement TLS et sauvegardes quotidiennes. Nous ne partageons jamais vos données avec des tiers.' },
                 { q: 'Le PDF généré est-il accepté par la DGI-CI ?', a: 'Oui. Nos factures incluent tous les éléments requis : NCC vendeur et acheteur, TVA 18% détaillée, numérotation séquentielle, date d\'émission et d\'échéance.' },
                 { q: 'Quels moyens de paiement pour l\'abonnement ?', a: 'Wave, Orange Money et MTN Money. Aucune carte bancaire requise. Paiement mensuel sans engagement.' },
-                { q: 'Comment fonctionne l\'assistant IA ?', a: 'L\'assistant FACTURAI (plans Pro et Business) analyse vos données en temps réel — factures, clients, paiements — et répond à vos questions en français. Il connaît la fiscalité ivoirienne et peut rédiger des relances.' },
+                { q: 'Comment fonctionnent les relances automatiques ?', a: 'À partir du plan Pro, FACTURA envoie automatiquement des emails de relance à J+3, J+7 et J+15 après la date d\'échéance. Le plan Business ajoute les relances WhatsApp pour multiplier vos chances de paiement.' },
                 { q: 'Puis-je annuler mon abonnement ?', a: 'Oui, à tout moment depuis la page Paramètres. Aucun frais d\'annulation. Vous conservez l\'accès jusqu\'à la fin de la période payée.' },
                 { q: 'Plusieurs utilisateurs peuvent-ils accéder au même compte ?', a: 'La gestion multi-utilisateurs est disponible sur le plan Business (jusqu\'à 5 utilisateurs). Les plans Gratuit et Pro sont mono-utilisateur.' },
               ].map(({ q, a }) => (
@@ -678,7 +679,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                   'Base de données',
                   'Génération PDF',
                   'Authentification',
-                  'Assistant IA',
+                  'Relances automatiques',
                   'Paiements mobile money',
                   'Export DGI',
                 ].map(service => (
@@ -812,6 +813,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               </ModalSection>
             </div>
           )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
