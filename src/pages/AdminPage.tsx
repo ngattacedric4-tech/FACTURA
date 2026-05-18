@@ -108,6 +108,29 @@ export function AdminPage() {
   }, [tab, isAdmin]);
   useEffect(() => { if (tab === 'keys' && isAdmin) { fetchKeys(); fetchEnforced(); } }, [tab, isAdmin]);
 
+  // Realtime: refresh users + stats quand un abonnement ou une activation change
+  useEffect(() => {
+    if (!isAdmin) return;
+    const channel = supabase
+      .channel('admin-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'subscriptions' }, () => {
+        fetchStats();
+        if (tab === 'users') fetchCompanies();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'company_activations' }, () => {
+        if (tab === 'users') fetchCompanies();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'companies' }, () => {
+        fetchStats();
+        if (tab === 'users') fetchCompanies();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'activation_keys' }, () => {
+        if (tab === 'keys') fetchKeys();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [isAdmin, tab]);
+
   async function fetchStats() {
     setLoadingStats(true);
     try {
