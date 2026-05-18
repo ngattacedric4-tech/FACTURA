@@ -7,6 +7,7 @@ import {
   Building2, MessageSquare, Activity, Shield,
   AlertTriangle, LogOut, Settings, Search, Plus, Trash2,
   ChevronLeft, ChevronRight, Menu, Key, Zap, CheckCircle2, XCircle,
+  Copy, Power, Clock, Ban,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -33,7 +34,7 @@ const LEAD_STATUS = [
 export function AdminPage() {
   const { user } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
-  const [tab, setTab] = useState<'overview' | 'users' | 'leads' | 'activity' | 'settings'>('overview');
+  const [tab, setTab] = useState<'overview' | 'users' | 'leads' | 'activity' | 'keys' | 'settings'>('overview');
 
   // Stats
   const [stats, setStats] = useState({
@@ -56,6 +57,19 @@ export function AdminPage() {
   const [recentInvoices, setRecentInvoices] = useState<any[]>([]);
   const [recentPayments, setRecentPayments] = useState<any[]>([]);
   const [loadingActivity, setLoadingActivity] = useState(false);
+
+  // Keys
+  const [keys, setKeys] = useState<any[]>([]);
+  const [loadingKeys, setLoadingKeys] = useState(false);
+  const [keysFilter, setKeysFilter] = useState<'all' | 'available' | 'used' | 'revoked'>('all');
+  const [genPlan, setGenPlan] = useState<'pro' | 'business' | 'enterprise' | 'starter'>('pro');
+  const [genDuration, setGenDuration] = useState<number>(30);
+  const [genNotes, setGenNotes] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [lastGeneratedKey, setLastGeneratedKey] = useState<string | null>(null);
+  const [enforcementOn, setEnforcementOn] = useState(false);
+  const [togglingEnforce, setTogglingEnforce] = useState(false);
+  const [confirmRevoke, setConfirmRevoke] = useState<string | null>(null);
 
   // Settings — admins
   const [admins, setAdmins] = useState<any[]>([]);
@@ -95,6 +109,7 @@ export function AdminPage() {
   useEffect(() => { if (tab === 'users'    && isAdmin) fetchCompanies(); },  [tab, isAdmin]);
   useEffect(() => { if (tab === 'leads'    && isAdmin) fetchLeads(); },      [tab, isAdmin]);
   useEffect(() => { if (tab === 'activity' && isAdmin) fetchActivity(); },   [tab, isAdmin]);
+  useEffect(() => { if (tab === 'keys'     && isAdmin) { fetchKeys(); fetchEnforcement(); } }, [tab, isAdmin]);
   useEffect(() => {
     if (tab === 'settings' && isAdmin) { fetchAdmins(); fetchAiConfig(); }
   }, [tab, isAdmin]);
@@ -159,6 +174,82 @@ export function AdminPage() {
       setRecentPayments(payData || []);
     } catch (e: any) { toast.error(e.message); }
     finally { setLoadingActivity(false); }
+  }
+
+  async function fetchKeys() {
+    setLoadingKeys(true);
+    try {
+      const { data, error } = await supabase
+        .from('activation_keys')
+        .select('*, used_by_company(id,name,email)')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setKeys(data || []);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setLoadingKeys(false); }
+  }
+
+  async function fetchEnforcement() {
+    try {
+      const { data } = await supabase.from('platform_settings').select('value').eq('key', 'activation_enforced').maybeSingle();
+      setEnforcementOn(data?.value === 'true');
+    } catch (e: any) { /* silent */ }
+  }
+
+  async function toggleEnforcement() {
+    setTogglingEnforce(true);
+    const next = !enforcementOn;
+    try {
+      const { error } = await supabase.from('platform_settings').upsert(
+        { key: 'activation_enforced', value: next ? 'true' : 'false', updated_at: new Date().toISOString() },
+        { onConflict: 'key' }
+      );
+      if (error) throw error;
+      setEnforcementOn(next);
+      toast.success(next
+        ? 'Activation REQUISE pour tous les utilisateurs.'
+        : 'Activation DÉSACTIVÉE — accès libre pour tous.');
+    } catch (e: any) { toast.error(e.message); }
+    finally { setTogglingEnforce(false); }
+  }
+
+  async function generateKey() {
+    if (generating) return;
+    setGenerating(true);
+    setLastGeneratedKey(null);
+    try {
+      const { data, error } = await supabase.rpc('admin_generate_key', {
+        p_plan: genPlan,
+        p_duration_days: genDuration,
+        p_notes: genNotes.trim() || null,
+      });
+      if (error) throw error;
+      const code = String(data);
+      setLastGeneratedKey(code);
+      setGenNotes('');
+      toast.success('Clé générée — copiez-la et envoyez-la au client.');
+      fetchKeys();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setGenerating(false); }
+  }
+
+  async function revokeKey(id: string) {
+    try {
+      const { error } = await supabase.rpc('admin_revoke_key', { p_key_id: id });
+      if (error) throw error;
+      toast.success('Clé révoquée.');
+      setConfirmRevoke(null);
+      fetchKeys();
+    } catch (e: any) { toast.error(e.message); }
+  }
+
+  async function copyToClipboard(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('Copié dans le presse-papier.');
+    } catch {
+      toast.error('Impossible de copier');
+    }
   }
 
   async function fetchAiConfig() {
@@ -349,6 +440,7 @@ export function AdminPage() {
     { id: 'users',     label: 'Utilisateurs', icon: Users },
     { id: 'leads',     label: 'Leads',        icon: MessageSquare },
     { id: 'activity',  label: 'Activité',     icon: Activity },
+    { id: 'keys',      label: 'Clés',         icon: Key },
     { id: 'settings',  label: 'Paramètres',   icon: Settings },
   ] as const;
 
@@ -746,6 +838,263 @@ export function AdminPage() {
                           </div>
                         </div>
                       ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── CLÉS D'ACTIVATION ── */}
+          {tab === 'keys' && (
+            <div className="space-y-6">
+              {/* Kill switch */}
+              <div className={`bg-white rounded-2xl border shadow-sm p-5 flex flex-col sm:flex-row sm:items-start justify-between gap-4 ${
+                enforcementOn ? 'border-red-100' : 'border-[#F3F4F6]'
+              }`}>
+                <div className="flex items-start gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                    enforcementOn ? 'bg-red-50 text-red-600' : 'bg-[#F9FAFB] text-[#9CA3AF]'
+                  }`}>
+                    <Power size={18} />
+                  </div>
+                  <div>
+                    <p className="text-[14px] font-bold text-[#0A0A0A]">
+                      Système d'activation : {enforcementOn ? 'ACTIVÉ' : 'DÉSACTIVÉ'}
+                    </p>
+                    <p className="text-[12px] text-[#6B7280] mt-0.5 max-w-md leading-relaxed">
+                      {enforcementOn
+                        ? `Tous les utilisateurs doivent saisir une clé valide pour accéder à FACTURA.`
+                        : `Mode test : accès libre pour tous. Activez quand vous êtes prêt à déployer le paiement.`}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={toggleEnforcement}
+                  disabled={togglingEnforce}
+                  className={`shrink-0 flex items-center gap-2 h-10 px-4 rounded-xl text-[13px] font-semibold transition-all ${
+                    enforcementOn
+                      ? 'bg-red-50 text-red-600 hover:bg-red-100'
+                      : 'bg-[#111827] text-white hover:bg-[#1F2937]'
+                  } disabled:opacity-50`}
+                >
+                  {togglingEnforce ? (
+                    <span className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+                  ) : enforcementOn ? (
+                    <><Ban size={14} /> Désactiver</>
+                  ) : (
+                    <><Power size={14} /> Activer</>
+                  )}
+                </button>
+              </div>
+
+              {/* Générer une clé */}
+              <div className="bg-white rounded-2xl border border-[#F3F4F6] shadow-sm overflow-hidden">
+                <div className="p-5 border-b border-[#F3F4F6]">
+                  <h2 className="text-[14px] font-bold text-[#0A0A0A]">Générer une nouvelle clé</h2>
+                  <p className="text-[12px] text-[#9CA3AF] mt-0.5">
+                    Format : FACT-XXXX-XXXX-XXXX-XXXX. Envoyez-la au client via WhatsApp ou email.
+                  </p>
+                </div>
+                <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] font-bold text-[#374151] uppercase tracking-wider">Plan</p>
+                    <CustomSelect
+                      size="md"
+                      value={genPlan}
+                      onChange={(v) => setGenPlan(v as typeof genPlan)}
+                      options={[
+                        { value: 'pro',        label: 'Pro — 5 000 FCFA/mois' },
+                        { value: 'business',   label: 'Business — 15 000 FCFA/mois' },
+                        { value: 'enterprise', label: 'Enterprise — sur devis' },
+                        { value: 'starter',    label: 'Starter (gratuit)' },
+                      ]}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] font-bold text-[#374151] uppercase tracking-wider">Durée</p>
+                    <CustomSelect
+                      size="md"
+                      value={String(genDuration)}
+                      onChange={(v) => setGenDuration(parseInt(v))}
+                      options={[
+                        { value: '30',  label: '30 jours (1 mois)' },
+                        { value: '90',  label: '90 jours (3 mois)' },
+                        { value: '180', label: '180 jours (6 mois)' },
+                        { value: '365', label: '365 jours (1 an)' },
+                      ]}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] font-bold text-[#374151] uppercase tracking-wider">Notes (optionnel)</p>
+                    <input
+                      value={genNotes}
+                      onChange={e => setGenNotes(e.target.value)}
+                      placeholder="Ex: Société XYZ, payé via Wave"
+                      className="w-full h-10 px-3 text-[13px] border border-[#E5E7EB] rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-[#111827]"
+                    />
+                  </div>
+                </div>
+                <div className="px-6 pb-6">
+                  <button
+                    onClick={generateKey}
+                    disabled={generating}
+                    className="flex items-center gap-2 h-10 px-5 bg-[#111827] text-white text-[13px] font-semibold rounded-xl hover:bg-[#1F2937] disabled:opacity-50 transition-all"
+                  >
+                    {generating
+                      ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      : <Plus size={14} />}
+                    Générer la clé
+                  </button>
+                </div>
+
+                {/* Dernière clé générée — bandeau copiable */}
+                {lastGeneratedKey && (
+                  <div className="mx-6 mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                      <p className="text-[13px] font-bold text-emerald-700">Clé générée avec succès</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 px-3 py-2.5 bg-white border border-emerald-200 rounded-lg text-[14px] font-mono font-bold text-[#0A0A0A] tracking-wider break-all">
+                        {lastGeneratedKey}
+                      </code>
+                      <button
+                        onClick={() => copyToClipboard(lastGeneratedKey)}
+                        className="h-10 px-3 bg-white border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors text-emerald-700 shrink-0"
+                      >
+                        <Copy size={14} />
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-emerald-600 mt-2">
+                      Envoyez cette clé au client. Elle ne sera plus affichée après cette session.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Liste des clés */}
+              <div className="bg-white rounded-2xl border border-[#F3F4F6] shadow-sm overflow-hidden">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-5 border-b border-[#F3F4F6]">
+                  <div>
+                    <h2 className="text-[14px] font-bold text-[#0A0A0A]">{keys.length} clé(s) au total</h2>
+                    <p className="text-[12px] text-[#9CA3AF] mt-0.5">Historique complet des clés d'activation générées.</p>
+                  </div>
+                  <div className="flex gap-1 flex-wrap">
+                    {[
+                      { id: 'all',       label: 'Toutes' },
+                      { id: 'available', label: 'Disponibles' },
+                      { id: 'used',      label: 'Utilisées' },
+                      { id: 'revoked',   label: 'Révoquées' },
+                    ].map(f => (
+                      <button
+                        key={f.id}
+                        onClick={() => setKeysFilter(f.id as typeof keysFilter)}
+                        className={`px-3 h-8 rounded-lg text-[12px] font-medium transition-all ${
+                          keysFilter === f.id
+                            ? 'bg-[#111827] text-white'
+                            : 'text-[#6B7280] hover:bg-[#F3F4F6]'
+                        }`}
+                      >{f.label}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[13px]">
+                    <thead className="bg-[#F9FAFB] border-b border-[#F3F4F6]">
+                      <tr>
+                        {['Code', 'Plan', 'Durée', 'Statut', 'Utilisée par', 'Notes', 'Créée le', ''].map(h => (
+                          <th key={h} className="text-left py-3 px-4 text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loadingKeys
+                        ? [1,2,3].map(i => (
+                            <tr key={i}><td colSpan={8} className="py-3 px-4">
+                              <div className="h-8 bg-[#F9FAFB] rounded animate-pulse" />
+                            </td></tr>
+                          ))
+                        : (() => {
+                            const filtered = keys.filter(k => {
+                              if (keysFilter === 'available') return !k.used_at && !k.revoked;
+                              if (keysFilter === 'used')      return !!k.used_at;
+                              if (keysFilter === 'revoked')   return k.revoked;
+                              return true;
+                            });
+                            if (filtered.length === 0) {
+                              return <tr><td colSpan={8} className="py-16 text-center text-[#9CA3AF] text-[13px]">Aucune clé dans cette catégorie</td></tr>;
+                            }
+                            return filtered.map(k => {
+                              const isUsed    = !!k.used_at;
+                              const isRevoked = k.revoked;
+                              const statusBadge = isRevoked
+                                ? { label: 'Révoquée',   cls: 'bg-red-100 text-red-700' }
+                                : isUsed
+                                ? { label: 'Utilisée',   cls: 'bg-emerald-100 text-emerald-700' }
+                                : { label: 'Disponible', cls: 'bg-blue-100 text-blue-700' };
+                              return (
+                                <tr key={k.id} className="border-b border-[#F9FAFB] hover:bg-[#F9FAFB] transition-colors">
+                                  <td className="py-3 px-4">
+                                    <div className="flex items-center gap-1.5">
+                                      <code className="font-mono text-[12px] font-bold text-[#0A0A0A] tracking-wider whitespace-nowrap">{k.code}</code>
+                                      <button onClick={() => copyToClipboard(k.code)} className="p-1 hover:bg-[#E5E7EB] rounded text-[#9CA3AF] hover:text-[#0A0A0A] transition-colors">
+                                        <Copy size={11} />
+                                      </button>
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-4">
+                                    <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${PLAN_COLORS[k.plan] || 'bg-gray-100 text-gray-600'}`}>
+                                      {PLAN_LABEL[k.plan as keyof typeof PLAN_LABEL] || k.plan}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-4 text-[#6B7280] whitespace-nowrap">
+                                    <Clock size={11} className="inline mr-1 text-[#9CA3AF]" />
+                                    {k.duration_days} j
+                                  </td>
+                                  <td className="py-3 px-4">
+                                    <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap ${statusBadge.cls}`}>
+                                      {statusBadge.label}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-4 text-[#6B7280]">
+                                    {k.used_by_company ? (
+                                      <div>
+                                        <p className="text-[12px] font-medium text-[#0A0A0A]">{k.used_by_company.name}</p>
+                                        <p className="text-[10px] text-[#9CA3AF]">{k.used_by_company.email || '—'}</p>
+                                      </div>
+                                    ) : <span className="text-[#D1D5DB]">—</span>}
+                                    {k.used_at && (
+                                      <p className="text-[10px] text-[#9CA3AF] mt-0.5">le {new Date(k.used_at).toLocaleDateString('fr-FR')}</p>
+                                    )}
+                                  </td>
+                                  <td className="py-3 px-4 text-[#6B7280] text-[12px] max-w-[200px]">
+                                    <p className="line-clamp-2">{k.notes || <span className="text-[#D1D5DB]">—</span>}</p>
+                                  </td>
+                                  <td className="py-3 px-4 text-[#9CA3AF] text-[12px] whitespace-nowrap">
+                                    {new Date(k.created_at).toLocaleDateString('fr-FR')}
+                                  </td>
+                                  <td className="py-3 px-4 text-right">
+                                    {!isUsed && !isRevoked && (
+                                      confirmRevoke === k.id ? (
+                                        <div className="flex gap-1 justify-end">
+                                          <button onClick={() => setConfirmRevoke(null)} className="px-2.5 h-7 text-[11px] border border-[#E5E7EB] rounded-lg hover:bg-[#F9FAFB] text-[#6B7280]">Annuler</button>
+                                          <button onClick={() => revokeKey(k.id)} className="px-2.5 h-7 text-[11px] bg-red-500 text-white rounded-lg hover:bg-red-600">Confirmer</button>
+                                        </div>
+                                      ) : (
+                                        <button
+                                          onClick={() => setConfirmRevoke(k.id)}
+                                          className="flex items-center gap-1 ml-auto text-[11px] text-red-500 hover:text-red-700 hover:bg-red-50 px-2.5 py-1 rounded-lg transition-colors"
+                                        >
+                                          <Trash2 size={11} /> Révoquer
+                                        </button>
+                                      )
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            });
+                          })()}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>

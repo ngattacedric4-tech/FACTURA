@@ -77,7 +77,33 @@ export interface Payment {
 export interface Subscription {
   id: string;
   company_id: string;
-  plan: 'starter' | 'business' | 'pro';
+  plan: 'starter' | 'pro' | 'business' | 'enterprise';
   status: 'active' | 'past_due' | 'canceled';
   current_period_end?: string;
+}
+
+export type ActivationPlan = 'starter' | 'pro' | 'business' | 'enterprise';
+
+export interface ActivationKey {
+  id: string;
+  code: string;
+  plan: ActivationPlan;
+  duration_days: number;
+  notes?: string;
+  created_by?: string;
+  created_at: string;
+  used_at?: string;
+  used_by_company?: string;
+  revoked: boolean;
+}
+
+export interface CompanyActivation {
+  id: string;
+  company_id: string;
+  current_key_id?: string;
+  plan: ActivationPlan;
+  activated_at: string;
+  expires_at: string;
+  renewed_count: number;
+  last_renewed_at?: string;
 }

@@ -302,7 +302,6 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
                       placeholder="Sélectionner un client"
                       options={clients.map(c => ({ value: c.id, label: c.name }))}
                     />
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280] pointer-events-none" size={16} />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -345,7 +344,6 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
                       disabled={!!savedInvoice}
                       options={PAYMENT_TERMS_OPTIONS}
                     />
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280] pointer-events-none" size={16} />
                   </div>
                 </div>
               </div>
@@ -430,7 +428,6 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
                               { value: 'metre',   label: 'Mètre' },
                             ]}
                           />
-                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280] pointer-events-none" size={16} />
                         </div>
                       </div>
 
@@ -453,7 +450,6 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
                             disabled={!!savedInvoice}
                             options={TVA_OPTIONS.map(o => ({ value: String(o.value), label: o.label }))}
                           />
-                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280] pointer-events-none" size={16} />
                         </div>
                       </div>
 
@@ -550,7 +546,6 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
                         { value: 'Espèces',          label: 'Espèces' },
                       ]}
                     />
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280] pointer-events-none" size={16} />
                   </div>
                 </div>
               </div>
