@@ -422,7 +422,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             <p className="text-[12px] font-bold text-[#9CA3AF] uppercase tracking-widest mb-3">TARIFS</p>
             <h2 className="text-[40px] font-black text-[#0A0A0A] tracking-tight">Simple et transparent.</h2>
             <p className="text-[14px] text-[#6B7280] mt-3 max-w-md mx-auto">
-              Activation par clé. Demandez votre clé sur WhatsApp, payez par Wave/Orange Money, débloquez instantanément.
+              Activation par clé. Demandez votre clé sur WhatsApp, recevez votre code, débloquez instantanément.
             </p>
           </motion.div>
 
@@ -619,21 +619,29 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                 </li>
                 <li><p className="text-[13px] text-white/50">Abidjan, Cocody<br/>Côte d'Ivoire</p></li>
               </ul>
-              <div className="mt-6">
-                <p className="text-[11px] font-bold text-white/30 uppercase tracking-widest mb-3">Nous suivre</p>
-                <div className="flex gap-3">
-                  {[
-                    { label: 'LI', href: 'https://www.linkedin.com/company/factura-ci', title: 'LinkedIn' },
-                    { label: 'TW', href: 'https://x.com/factura_ci', title: 'Twitter / X' },
-                    { label: 'WA', href: WHATSAPP_URL, title: 'WhatsApp' },
-                  ].map(s => (
-                    <a key={s.label} href={s.href} title={s.title} target="_blank" rel="noopener noreferrer"
-                      className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-[10px] font-black text-white/60 hover:text-white transition-all">
-                      {s.label}
-                    </a>
-                  ))}
-                </div>
+            </div>
+          </div>
+
+          {/* CONTACTEZ-MOI — collaboration / service */}
+          <div className="py-10 border-b border-white/10">
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+              <div className="text-center md:text-left">
+                <p className="text-[11px] font-bold text-[#25D366] uppercase tracking-widest mb-2">Contactez-moi</p>
+                <h3 className="text-[20px] md:text-[22px] font-black tracking-tight text-white mb-2">
+                  Une collaboration ? Un service sur mesure ?
+                </h3>
+                <p className="text-[13px] text-white/60 max-w-md">
+                  Discutons directement sur WhatsApp. Réponse rapide, devis personnalisé.
+                </p>
               </div>
+              <a
+                href={`${WHATSAPP_URL}?text=${encodeURIComponent('Bonjour, je souhaite vous contacter pour une collaboration / un service.')}`}
+                target="_blank" rel="noopener noreferrer"
+                className="shrink-0 flex items-center gap-2 bg-[#25D366] hover:bg-[#1FAD54] text-white text-[14px] font-bold px-6 py-3.5 rounded-xl transition-colors"
+              >
+                <MessageCircle size={18} />
+                +225 01 04 61 76 01
+              </a>
             </div>
           </div>
 
@@ -675,7 +683,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               </ModalSection>
 
               <ModalSection title="5. Activer un plan payant">
-                <p>Demandez une clé d'activation par WhatsApp. Payez par Wave / Orange Money / MTN Money. Vous recevez un code <code className="bg-[#F3F4F6] px-1.5 py-0.5 rounded text-[12px]">XXXX-XXXX-XXXX-XXXX</code> à coller dans l'app. Plan actif instantanément.</p>
+                <p>Demandez une clé d'activation par WhatsApp. Vous recevez un code <code className="bg-[#F3F4F6] px-1.5 py-0.5 rounded text-[12px]">XXXX-XXXX-XXXX-XXXX</code> à coller dans l'app. Plan actif instantanément.</p>
               </ModalSection>
 
               <ModalSection title="6. Export DGI">
@@ -730,11 +738,11 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               {[
                 { q: "Que fait FACTURA exactement ?", a: "FACTURA génère des factures et devis professionnels en PDF, conformes DGI-CI, et permet de les envoyer directement à vos clients via WhatsApp. Rien de plus, rien de moins." },
                 { q: "Le plan Gratuit est-il vraiment sans limite de temps ?", a: "Oui, le plan Gratuit est à vie (5 factures et 3 devis par mois). En plus, vous avez 30 jours d'essai sans restriction au démarrage." },
-                { q: "Comment fonctionne l'activation par clé ?", a: "Vous demandez une clé sur WhatsApp, payez par Wave/Orange Money/MTN, recevez un code XXXX-XXXX-XXXX-XXXX, le collez dans l'app. Le plan est actif instantanément." },
+                { q: "Comment fonctionne l'activation par clé ?", a: "Vous demandez une clé sur WhatsApp, recevez un code XXXX-XXXX-XXXX-XXXX, le collez dans l'app. Le plan est actif instantanément." },
                 { q: "Comment j'envoie une facture sur WhatsApp ?", a: "Depuis la facture créée, cliquez sur 'Envoyer WhatsApp'. Le PDF s'ouvre dans la conversation WhatsApp avec le numéro de votre client pré-rempli." },
                 { q: "Mes données sont-elles sécurisées ?", a: "Vos données sont hébergées sur Supabase (AWS Paris) avec chiffrement TLS et sauvegardes quotidiennes. Nous ne partageons jamais vos données." },
                 { q: "Le PDF généré est-il accepté par la DGI-CI ?", a: "Oui. Nos factures incluent tous les éléments requis : NCC vendeur et acheteur, TVA 18% détaillée, numérotation séquentielle." },
-                { q: "Quels moyens de paiement pour activer mon plan ?", a: "Wave, Orange Money, MTN Money. Aucune carte bancaire requise." },
+                { q: "Quels moyens de paiement pour activer mon plan ?", a: "Tous moyens — réglez directement avec moi via WhatsApp (mobile money, virement, espèces). Aucune carte bancaire requise." },
                 { q: "Puis-je arrêter à tout moment ?", a: "Oui. À l'expiration de votre clé, vous repassez au plan Gratuit. Vos données sont conservées. Pas de renouvellement automatique." },
               ].map(({ q, a }) => (
                 <div key={q} className="border-b border-[#F3F4F6] pb-4 last:border-0">
