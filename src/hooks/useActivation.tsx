@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -13,7 +13,9 @@ export interface ActivationState {
   refresh: () => Promise<void>;
 }
 
-export function useActivation(): ActivationState {
+const ActivationContext = createContext<ActivationState | null>(null);
+
+export const ActivationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { company } = useAuth();
   const [enforced, setEnforced] = useState(false);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
@@ -46,5 +48,15 @@ export function useActivation(): ActivationState {
   const minutesLeft = active ? Math.ceil((expMs - now) / 60_000) : 0;
   const daysLeft    = active ? Math.ceil((expMs - now) / 86_400_000) : 0;
 
-  return { enforced, expiresAt, plan, active, daysLeft, minutesLeft, loading, refresh: fetchAll };
+  return (
+    <ActivationContext.Provider value={{ enforced, expiresAt, plan, active, daysLeft, minutesLeft, loading, refresh: fetchAll }}>
+      {children}
+    </ActivationContext.Provider>
+  );
+};
+
+export function useActivation(): ActivationState {
+  const ctx = useContext(ActivationContext);
+  if (!ctx) throw new Error('useActivation must be used within <ActivationProvider>');
+  return ctx;
 }

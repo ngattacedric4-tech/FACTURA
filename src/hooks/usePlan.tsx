@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { PlanId, PLAN_LIMITS, PlanLimits } from '@/lib/plans';
@@ -10,7 +10,18 @@ export interface UsageCounters {
   productsCount: number;
 }
 
-export function usePlan() {
+interface PlanContextValue {
+  plan: PlanId;
+  limits: PlanLimits;
+  usage: UsageCounters;
+  loading: boolean;
+  canCreate: (kind: 'invoice' | 'estimate' | 'client' | 'product') => boolean;
+  refresh: () => Promise<void>;
+}
+
+const PlanContext = createContext<PlanContextValue | null>(null);
+
+export const PlanProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { company } = useAuth();
   const [plan, setPlan] = useState<PlanId>('starter');
   const [usage, setUsage] = useState<UsageCounters>({ invoicesThisMonth: 0, estimatesThisMonth: 0, clientsCount: 0, productsCount: 0 });
@@ -61,5 +72,15 @@ export function usePlan() {
     return true;
   };
 
-  return { plan, limits, usage, loading, canCreate, refresh: fetchAll };
+  return (
+    <PlanContext.Provider value={{ plan, limits, usage, loading, canCreate, refresh: fetchAll }}>
+      {children}
+    </PlanContext.Provider>
+  );
+};
+
+export function usePlan(): PlanContextValue {
+  const ctx = useContext(PlanContext);
+  if (!ctx) throw new Error('usePlan must be used within <PlanProvider>');
+  return ctx;
 }

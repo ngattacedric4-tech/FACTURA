@@ -12,7 +12,8 @@ import { useAuth } from './hooks/useAuth';
 import { useAdmin } from './hooks/useAdmin';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { ActivationPage } from './pages/ActivationPage';
-import { useActivation } from './hooks/useActivation';
+import { useActivation, ActivationProvider } from './hooks/useActivation';
+import { PlanProvider } from './hooks/usePlan';
 import { CheckoutDemoPage } from './pages/CheckoutDemoPage';
 import { Dashboard } from './pages/Dashboard';
 import { ClientsPage } from './pages/ClientsPage';
@@ -193,7 +194,11 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <AppContent />
+        <PlanProvider>
+          <ActivationProvider>
+            <AppContent />
+          </ActivationProvider>
+        </PlanProvider>
         <Toaster
           position="bottom-right"
           toastOptions={{
