@@ -92,6 +92,7 @@ export function AdminPage() {
   const [keyForm, setKeyForm] = useState<{ plan: string; duration_minutes: number; notes: string }>({ plan: 'pro', duration_minutes: 30 * 1440, notes: '' });
   const [generatingKey, setGeneratingKey] = useState(false);
   const [justGenerated, setJustGenerated] = useState<{ code: string; plan: string; duration_minutes: number } | null>(null);
+  const [keysFilter, setKeysFilter] = useState<'all' | 'available' | 'active' | 'expired' | 'revoked'>('all');
 
   // Layout
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sidebar-collapsed') === 'true');
@@ -390,6 +391,14 @@ export function AdminPage() {
     if (minutes < 60)         return `${minutes} min`;
     if (minutes < 1440)       return `${Math.round(minutes / 60)} h`;
     return `${Math.round(minutes / 1440)} j`;
+  }
+
+  function keyStatus(k: any): 'available' | 'active' | 'expired' | 'revoked' {
+    if (k.revoked_at) return 'revoked';
+    if (!k.used_at)   return 'available';
+    const dur = k.duration_minutes || ((k.duration_days || 0) * 1440);
+    const expMs = new Date(k.used_at).getTime() + dur * 60_000;
+    return expMs < Date.now() ? 'expired' : 'active';
   }
 
   async function revokeKey(id: string) {
@@ -962,8 +971,34 @@ export function AdminPage() {
 
               {/* Keys list */}
               <div className="bg-white rounded-2xl border border-[#F3F4F6] shadow-sm overflow-hidden">
-                <div className="p-5 border-b border-[#F3F4F6]">
-                  <h2 className="text-[14px] font-bold text-[#0A0A0A]">{keys.length} clé{keys.length > 1 ? 's' : ''} générée{keys.length > 1 ? 's' : ''}</h2>
+                <div className="p-5 border-b border-[#F3F4F6] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {(() => {
+                      const counts = {
+                        all:       keys.length,
+                        available: keys.filter(k => keyStatus(k) === 'available').length,
+                        active:    keys.filter(k => keyStatus(k) === 'active').length,
+                        expired:   keys.filter(k => keyStatus(k) === 'expired').length,
+                        revoked:   keys.filter(k => keyStatus(k) === 'revoked').length,
+                      };
+                      const tabs: { id: typeof keysFilter; label: string; color: string }[] = [
+                        { id: 'all',       label: `Toutes (${counts.all})`,             color: 'bg-[#111827] text-white' },
+                        { id: 'available', label: `Disponibles (${counts.available})`,  color: 'bg-emerald-100 text-emerald-700' },
+                        { id: 'active',    label: `Actives (${counts.active})`,         color: 'bg-blue-100 text-blue-700' },
+                        { id: 'expired',   label: `Expirées (${counts.expired})`,       color: 'bg-orange-100 text-orange-700' },
+                        { id: 'revoked',   label: `Révoquées (${counts.revoked})`,      color: 'bg-red-100 text-red-700' },
+                      ];
+                      return tabs.map(t => (
+                        <button key={t.id}
+                          onClick={() => setKeysFilter(t.id)}
+                          className={`text-[11px] font-bold px-2.5 py-1 rounded-full transition-all ${
+                            keysFilter === t.id ? t.color : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#E5E7EB]'
+                          }`}>
+                          {t.label}
+                        </button>
+                      ));
+                    })()}
+                  </div>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-[13px]">
@@ -981,15 +1016,24 @@ export function AdminPage() {
                               <div className="h-8 bg-[#F9FAFB] rounded animate-pulse" />
                             </td></tr>
                           ))
-                        : keys.length === 0
-                        ? <tr><td colSpan={7} className="py-16 text-center text-[#9CA3AF] text-[13px]">Aucune clé générée pour le moment.</td></tr>
-                        : keys.map((k: any) => {
+                        : keys.filter(k => keysFilter === 'all' || keyStatus(k) === keysFilter).length === 0
+                        ? <tr><td colSpan={7} className="py-16 text-center text-[#9CA3AF] text-[13px]">
+                            {keysFilter === 'all' ? 'Aucune clé générée pour le moment.' : `Aucune clé "${keysFilter}".`}
+                          </td></tr>
+                        : keys.filter(k => keysFilter === 'all' || keyStatus(k) === keysFilter).map((k: any) => {
                             const used    = !!k.used_at;
                             const revoked = !!k.revoked_at;
-                            const statusLabel = revoked ? 'Révoquée' : used ? 'Utilisée' : 'Disponible';
-                            const statusColor = revoked ? 'bg-red-100 text-red-700'
-                                              : used    ? 'bg-gray-200 text-gray-600'
-                                                        : 'bg-emerald-100 text-emerald-700';
+                            const dur     = k.duration_minutes || ((k.duration_days || 0) * 1440);
+                            const expDate = used && k.used_at ? new Date(new Date(k.used_at).getTime() + dur * 60_000) : null;
+                            const isExpired = !!expDate && expDate.getTime() < Date.now();
+                            const statusLabel = revoked   ? 'Révoquée'
+                                              : isExpired ? 'Expirée'
+                                              : used      ? 'Active'
+                                                          : 'Disponible';
+                            const statusColor = revoked   ? 'bg-red-100 text-red-700'
+                                              : isExpired ? 'bg-orange-100 text-orange-700'
+                                              : used      ? 'bg-blue-100 text-blue-700'
+                                                          : 'bg-emerald-100 text-emerald-700';
                             return (
                               <tr key={k.id} className="border-b border-[#F9FAFB] hover:bg-[#F9FAFB] transition-colors">
                                 <td className="py-3 px-4 font-mono text-[12px] font-bold text-[#0A0A0A]">{k.code}</td>
@@ -998,9 +1042,15 @@ export function AdminPage() {
                                     {PLAN_LABEL[k.plan as keyof typeof PLAN_LABEL] || k.plan}
                                   </span>
                                 </td>
-                                <td className="py-3 px-4 text-[#6B7280] whitespace-nowrap">{formatDuration(k.duration_minutes || (k.duration_days * 1440))}</td>
+                                <td className="py-3 px-4 text-[#6B7280] whitespace-nowrap">{formatDuration(dur)}</td>
                                 <td className="py-3 px-4">
                                   <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${statusColor}`}>{statusLabel}</span>
+                                  {expDate && (
+                                    <p className="text-[10px] text-[#9CA3AF] mt-0.5">
+                                      {isExpired ? 'Expirée le ' : 'Expire le '}
+                                      {expDate.toLocaleDateString('fr-FR')}
+                                    </p>
+                                  )}
                                 </td>
                                 <td className="py-3 px-4 text-[#6B7280]">{k.used_company?.name || (used ? '—' : '')}</td>
                                 <td className="py-3 px-4 text-[#9CA3AF] text-[12px] max-w-[200px] truncate">{k.notes || '—'}</td>
