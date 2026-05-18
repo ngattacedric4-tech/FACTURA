@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Building2 } from 'lucide-react';
+import { Building2, LogOut } from 'lucide-react';
 
 export function OnboardingPage() {
   const { user, refreshCompany } = useAuth();
@@ -13,6 +13,20 @@ export function OnboardingPage() {
   const [form, setForm] = useState({
     name: '', ncc: '', phone: '', email: '', address: '',
   });
+
+  // Permet au bouton « back » du navigateur de sortir de l'étape onboarding
+  // (déconnecte → retour landing). Sans ça, le user est bloqué tant qu'il
+  // n'a pas créé son entreprise.
+  useEffect(() => {
+    if (window.location.hash !== '#onboarding') {
+      window.history.pushState({ step: 'onboarding' }, '', '#onboarding');
+    }
+    const handlePopState = () => {
+      supabase.auth.signOut();
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const update = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(prev => ({ ...prev, [k]: e.target.value }));
@@ -99,6 +113,15 @@ export function OnboardingPage() {
               </span>
             ) : 'Commencer'}
           </Button>
+
+          <button
+            type="button"
+            onClick={() => supabase.auth.signOut()}
+            className="w-full flex items-center justify-center gap-2 text-[12px] text-[#9CA3AF] hover:text-[#111827] transition-colors py-2"
+          >
+            <LogOut size={13} />
+            Annuler et changer de compte
+          </button>
         </form>
       </div>
     </div>
