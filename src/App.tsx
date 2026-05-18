@@ -11,6 +11,8 @@ import { AuthPages } from './pages/AuthPages';
 import { useAuth } from './hooks/useAuth';
 import { useAdmin } from './hooks/useAdmin';
 import { OnboardingPage } from './pages/OnboardingPage';
+import { ActivationPage } from './pages/ActivationPage';
+import { useActivation } from './hooks/useActivation';
 import { CheckoutDemoPage } from './pages/CheckoutDemoPage';
 import { Dashboard } from './pages/Dashboard';
 import { ClientsPage } from './pages/ClientsPage';
@@ -44,6 +46,7 @@ function readHash() {
 function AppContent() {
   const { user, company, loading } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
+  const { enforced, active, loading: activationLoading } = useActivation();
   const prevUserIdRef = useRef<string | null | undefined>(undefined);
 
   // All view state derived from a single source: the URL hash
@@ -128,6 +131,11 @@ function AppContent() {
   if (isAdmin) return <><AdminPage /><AIAssistantAdmin /></>;
 
   if (!company) return <OnboardingPage />;
+
+  // Activation gate — kill switch ON + plan expiré → page d'activation
+  if (enforced && !activationLoading && !active) {
+    return <ActivationPage />;
+  }
 
   // Checkout demo — full-page sans rechargement
   if (checkoutData) {

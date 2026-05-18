@@ -1,8 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, useInView, animate } from 'motion/react';
-import { ArrowRight, CheckCircle2, ReceiptText, ShieldCheck, Zap, Clock, FileText, Users, TrendingUp, Star, ChevronRight, Menu, X, CheckCircle, AlertCircle } from 'lucide-react';
+import {
+  ArrowRight, CheckCircle2, ReceiptText, ShieldCheck,
+  FileText, Printer, MessageCircle, Star, Menu, X, CheckCircle,
+  Sparkles,
+} from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+
+const WHATSAPP_NUMBER = '2250104617601';
+const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}`;
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -24,7 +31,7 @@ function Counter({ to, suffix = '' }: { to: number; suffix?: string }) {
   return <span ref={ref}>0{suffix}</span>;
 }
 
-// Floating invoice card mock
+// Mock invoice
 function MockInvoice() {
   return (
     <motion.div
@@ -34,10 +41,8 @@ function MockInvoice() {
       style={{ perspective: 1000 }}
       className="relative max-w-sm w-full"
     >
-      {/* Shadow card behind */}
       <div className="absolute inset-0 translate-x-3 translate-y-3 bg-[#111827]/10 rounded-2xl" />
       <div className="relative bg-white rounded-2xl p-6 border border-[#E5E7EB] shadow-2xl">
-        {/* Header */}
         <div className="flex items-start justify-between mb-6">
           <div>
             <div className="w-8 h-8 bg-[#111827] rounded-lg flex items-center justify-center mb-3">
@@ -55,14 +60,12 @@ function MockInvoice() {
           </div>
         </div>
 
-        {/* Client */}
         <div className="bg-[#F9FAFB] rounded-xl p-3 mb-4">
           <p className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">CLIENT</p>
           <p className="text-[13px] font-semibold text-[#111827]">Orange Côte d'Ivoire SA</p>
           <p className="text-[11px] text-[#6B7280]">NCC : 0012345 A</p>
         </div>
 
-        {/* Lines */}
         <div className="space-y-2 mb-4">
           {[
             { desc: 'Développement application mobile', qty: 1, price: '850 000' },
@@ -78,7 +81,6 @@ function MockInvoice() {
           ))}
         </div>
 
-        {/* Totals */}
         <div className="border-t border-[#F3F4F6] pt-3 space-y-1">
           <div className="flex justify-between text-[11px] text-[#6B7280]">
             <span>Sous-total HT</span><span className="font-mono">1 000 000 FCFA</span>
@@ -90,21 +92,24 @@ function MockInvoice() {
             <span>NET À PAYER</span><span className="font-mono">1 180 000 FCFA</span>
           </div>
         </div>
-
-        {/* Wave badge */}
-        <div className="mt-4 flex items-center gap-2 bg-blue-50 rounded-xl p-2.5">
-          <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white text-[9px] font-black">W</div>
-          <p className="text-[11px] text-blue-700 font-medium">Paiement Wave accepté</p>
-        </div>
       </div>
 
-      {/* Floating badge */}
+      {/* WhatsApp delivery bubble */}
       <motion.div
         animate={{ y: [0, -8, 0] }}
         transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut' }}
-        className="absolute -top-4 -right-4 bg-emerald-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1"
+        className="absolute -bottom-4 -right-4 bg-[#25D366] text-white text-[11px] font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5"
       >
-        <CheckCircle2 size={12}/> Conforme DGI
+        <MessageCircle size={12}/> Envoyée sur WhatsApp
+      </motion.div>
+
+      {/* Conforme DGI badge */}
+      <motion.div
+        animate={{ y: [0, -6, 0] }}
+        transition={{ repeat: Infinity, duration: 3.4, ease: 'easeInOut', delay: 0.5 }}
+        className="absolute -top-4 -left-4 bg-emerald-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5"
+      >
+        <ShieldCheck size={12}/> Conforme DGI
       </motion.div>
     </motion.div>
   );
@@ -121,27 +126,84 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  const steps = [
+    {
+      n: '1',
+      icon: FileText,
+      title: 'Créez la facture',
+      desc: 'Client, produits, TVA 18% auto. Numérotation séquentielle conforme DGI. 30 secondes chrono.',
+    },
+    {
+      n: '2',
+      icon: Printer,
+      title: 'PDF prêt instantanément',
+      desc: 'Document professionnel avec votre logo, NCC, RCCM. Imprimez ou téléchargez en un clic.',
+    },
+    {
+      n: '3',
+      icon: MessageCircle,
+      title: 'Envoyez sur WhatsApp',
+      desc: 'Le client reçoit le PDF directement dans sa conversation WhatsApp. Pas d\'email, pas de friction.',
+    },
+  ];
+
   const features = [
-    { icon: FileText,   title: 'Factures & Devis',  desc: 'Créez des documents professionnels conformes DGI en 30 secondes avec génération PDF automatique.' },
-    { icon: ShieldCheck, title: 'Conformité DGI-CI', desc: 'Calcul TVA 18% automatique. Export des registres mensuels obligatoires en un clic.' },
-    { icon: Clock,       title: 'Relances auto',     desc: 'Plus jamais d\'impayé oublié. Relances WhatsApp automatiques J+3, J+7, J+15 après échéance.' },
-    { icon: TrendingUp,  title: 'Tableau de bord',   desc: 'Visualisez votre CA, vos impayés et vos devis en temps réel depuis votre mobile.' },
-    { icon: Users,       title: 'Gestion clients',   desc: 'Carnet de clients complet avec historique des factures par client et NCC intégré.' },
-    { icon: Zap,         title: 'Paiement Wave',     desc: 'Vos clients paient par Wave directement depuis la facture. Encaissement en 30 secondes.' },
+    {
+      icon: FileText,
+      title: 'Factures & Devis pro',
+      desc: 'Documents conformes DGI-CI avec numérotation séquentielle, TVA automatique et logo personnalisé.',
+    },
+    {
+      icon: Printer,
+      title: 'PDF imprimable',
+      desc: 'Génération PDF haute qualité, prête à imprimer ou archiver. Format A4 standard.',
+    },
+    {
+      icon: MessageCircle,
+      title: 'Envoi WhatsApp 1-clic',
+      desc: 'Partagez chaque facture à votre client directement sur WhatsApp. Lien PDF instantané.',
+    },
+    {
+      icon: ShieldCheck,
+      title: 'Conforme DGI-CI',
+      desc: 'TVA 18%, NCC, registre mensuel exportable. Tout ce que la DGI exige, inclus par défaut.',
+    },
   ];
 
   const plans = [
-    { id: 'starter',    name: 'Gratuit',    price: '0',       period: '/mois',  features: ['5 factures / mois', '3 devis / mois', "Jusqu'à 10 clients", "Jusqu'à 20 produits", 'PDF avec marque FACTURA'], cta: 'Démarrer gratuitement', popular: false, enterprise: false },
-    { id: 'pro',        name: 'Pro',        price: '5 000',   period: '/mois',  features: ['Factures & devis illimités', 'Clients & produits illimités', 'PDF sans marque + logo', 'Export DGI mensuel', 'Support email 48h'], cta: 'Choisir Pro', popular: true, enterprise: false },
-    { id: 'business',   name: 'Business',   price: '15 000',  period: '/mois',  features: ['Tout Pro inclus', '5 utilisateurs', 'Agent IA WhatsApp 24/7', 'Analyses IA prédictives', 'API + webhooks', 'Support prioritaire 24h'], cta: 'Choisir Business', popular: false, enterprise: false },
-    { id: 'enterprise', name: 'Enterprise', price: 'Sur devis', period: '',     features: ['Tout Business inclus', 'Agent IA personnalisé entraîné sur vos données', 'Multi-entreprises', 'Utilisateurs illimités + rôles', 'SSO Google / Microsoft', 'SLA 99.9% + account manager'], cta: 'Contacter le commercial', popular: false, enterprise: true },
+    {
+      id: 'starter',
+      name: 'Gratuit',
+      price: '0',
+      period: '/mois',
+      features: ['5 factures / mois', '3 devis / mois', "Jusqu'à 10 clients", 'PDF avec marque FACTURA', 'Essai 30 jours sans engagement'],
+      cta: 'Démarrer gratuitement',
+      action: 'signup' as const,
+      popular: false,
+    },
+    {
+      id: 'pro',
+      name: 'Pro',
+      price: '5 000',
+      period: 'FCFA / mois',
+      features: ['Factures & devis illimités', 'Clients illimités', 'PDF sans marque + logo', 'Envoi WhatsApp 1-clic', 'Export DGI mensuel'],
+      cta: 'Demander une clé',
+      action: 'whatsapp' as const,
+      popular: true,
+    },
   ];
 
   const testimonials = [
-    { name: 'Kouamé Assi', role: 'Directeur, KA Digital', text: 'Factura m\'a fait gagner 3h par semaine. Mes factures Wave sont payées 2× plus vite.', stars: 5 },
-    { name: 'Aminata Diallo', role: 'Freelance Designer', text: 'Enfin un outil en français qui comprend la DGI ivoirienne. Simple et professionnel.', stars: 5 },
-    { name: 'Jean-Baptiste Koné', role: 'Gérant, JBK Construction', text: 'Le suivi des impayés m\'a permis de récupérer 2,4M FCFA en 1 mois.', stars: 5 },
+    { name: 'Kouamé Assi', role: 'Directeur, KA Digital', text: 'En 30 secondes j\'envoie une facture sur WhatsApp à mon client. Avant je perdais 10 minutes par facture.', stars: 5 },
+    { name: 'Aminata Diallo', role: 'Freelance Designer', text: 'Le PDF est nickel, conforme DGI, et part directement sur WhatsApp. Mes clients adorent.', stars: 5 },
+    { name: 'Jean-Baptiste Koné', role: 'Gérant, JBK Construction', text: 'Plus de mails perdus. WhatsApp + PDF = factures réglées en 2 jours au lieu de 2 semaines.', stars: 5 },
   ];
+
+  function planCta(action: 'signup' | 'whatsapp', planName: string) {
+    if (action === 'signup') return onGetStarted();
+    const msg = encodeURIComponent(`Bonjour, je souhaite une clé d'activation FACTURA pour le plan ${planName}.`);
+    window.open(`${WHATSAPP_URL}?text=${msg}`, '_blank', 'noopener,noreferrer');
+  }
 
   return (
     <div className="min-h-screen bg-white text-[#0A0A0A] overflow-x-hidden" style={{ fontFamily: "'Geist Variable', system-ui, sans-serif" }}>
@@ -164,9 +226,9 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
 
           <div className="hidden md:flex items-center gap-8">
             {[
-              {label:'Fonctionnalités', id:'fonctionnalites'},
-              {label:'Tarifs', id:'tarifs'},
-              {label:'Témoignages', id:'temoignages'}
+              { label: 'Comment ça marche', id: 'workflow' },
+              { label: 'Fonctionnalités',  id: 'fonctionnalites' },
+              { label: 'Tarifs',           id: 'tarifs' },
             ].map(item => (
               <button key={item.id}
                 onClick={() => document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth' })}
@@ -190,7 +252,6 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
           </button>
         </div>
 
-        {/* Mobile menu */}
         {menuOpen && (
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
             className="md:hidden bg-white border-t border-[#F3F4F6] px-6 py-4 space-y-3">
@@ -202,7 +263,6 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
 
       {/* HERO */}
       <section className="pt-32 pb-20 px-6 relative overflow-hidden">
-        {/* Background grid */}
         <div className="absolute inset-0 pointer-events-none" style={{
           backgroundImage: 'linear-gradient(to right, #F3F4F6 1px, transparent 1px), linear-gradient(to bottom, #F3F4F6 1px, transparent 1px)',
           backgroundSize: '60px 60px',
@@ -211,23 +271,22 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
 
         <div className="max-w-6xl mx-auto relative">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-            {/* Left */}
             <div>
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
                 <div className="inline-flex items-center gap-2 bg-[#F3F4F6] border border-[#E5E7EB] px-3 py-1.5 rounded-full text-[12px] font-semibold text-[#374151] mb-6">
-                  <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                  N°1 de la facturation en Côte d'Ivoire
+                  <Sparkles size={12} className="text-amber-500" />
+                  Facture pro + WhatsApp en 30 secondes
                 </div>
               </motion.div>
 
               <motion.h1
                 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, delay: 0.1 }}
-                className="text-[52px] leading-[1.08] font-black text-[#0A0A0A] tracking-tight mb-6"
+                className="text-[52px] leading-[1.05] font-black text-[#0A0A0A] tracking-tight mb-6"
               >
-                Facturez vite.<br />
-                <span className="text-[#6B7280]">Soyez payé</span><br />
-                encore plus vite.
+                Une facture.<br />
+                Un PDF.<br />
+                <span className="text-[#25D366]">Un WhatsApp.</span>
               </motion.h1>
 
               <motion.p
@@ -235,7 +294,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                 transition={{ duration: 0.7, delay: 0.2 }}
                 className="text-[16px] text-[#6B7280] leading-relaxed mb-8 max-w-md"
               >
-                La solution de facturation conçue pour les PME ivoiriennes. Conformité DGI, paiement Wave intégré, relances automatiques. Tout ce qu'il faut, rien de superflu.
+                L'outil de facturation le plus simple de Côte d'Ivoire. Créez votre devis ou facture, générez le PDF, envoyez-le sur WhatsApp à votre client. Conforme DGI.
               </motion.p>
 
               <motion.div
@@ -247,9 +306,10 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                   className="flex items-center justify-center gap-2 bg-[#111827] text-white text-[14px] font-semibold px-6 py-3.5 rounded-xl hover:bg-[#1F2937] transition-all shadow-lg shadow-black/10">
                   Créer mon compte gratuit <ArrowRight size={16} />
                 </button>
-                <button onClick={onLogin}
+                <button
+                  onClick={() => document.getElementById('workflow')?.scrollIntoView({ behavior: 'smooth' })}
                   className="flex items-center justify-center gap-2 border border-[#E5E7EB] text-[#374151] text-[14px] font-medium px-6 py-3.5 rounded-xl hover:bg-[#F9FAFB] transition-all">
-                  Se connecter
+                  Voir la démo
                 </button>
               </motion.div>
 
@@ -265,12 +325,11 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                 </div>
                 <div>
                   <div className="flex gap-0.5 mb-0.5">{[1,2,3,4,5].map(i=><Star key={i} size={12} className="text-amber-400 fill-amber-400"/>)}</div>
-                  <p className="text-[12px] text-[#6B7280]"><strong className="text-[#111827]">500+</strong> PME ivoiriennes font confiance à Factura</p>
+                  <p className="text-[12px] text-[#6B7280]"><strong className="text-[#111827]">500+</strong> PME ivoiriennes utilisent FACTURA</p>
                 </div>
               </motion.div>
             </div>
 
-            {/* Right — Invoice mockup */}
             <div className="hidden lg:flex items-center justify-center">
               <MockInvoice />
             </div>
@@ -283,10 +342,10 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
         <div className="max-w-6xl mx-auto px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {[
-              { value: 500, suffix: '+', label: 'PME utilisatrices' },
-              { value: 12000, suffix: '+', label: 'Factures émises' },
-              { value: 98, suffix: '%', label: 'Satisfaction client' },
-              { value: 3, suffix: 'h', label: 'Gagnées par semaine' },
+              { value: 500,   suffix: '+', label: 'PME utilisatrices' },
+              { value: 12000, suffix: '+', label: 'Factures envoyées' },
+              { value: 30,    suffix: 's', label: 'Pour facturer un client' },
+              { value: 100,   suffix: '%', label: 'Conforme DGI-CI' },
             ].map((s, i) => (
               <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.1 }} viewport={{ once: true }}>
@@ -300,15 +359,44 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
         </div>
       </section>
 
+      {/* WORKFLOW 3 STEPS */}
+      <section id="workflow" className="py-24 px-6">
+        <div className="max-w-6xl mx-auto">
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-16">
+            <p className="text-[12px] font-bold text-[#9CA3AF] uppercase tracking-widest mb-3">COMMENT ÇA MARCHE</p>
+            <h2 className="text-[40px] font-black text-[#0A0A0A] tracking-tight">3 étapes.<br/>Aucune complication.</h2>
+          </motion.div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {steps.map((s, i) => (
+              <motion.div key={i}
+                initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.12 }} viewport={{ once: true }}
+                className="relative bg-white border border-[#E5E7EB] rounded-2xl p-7"
+              >
+                <div className="absolute -top-3 -left-3 w-9 h-9 bg-[#111827] text-white rounded-xl flex items-center justify-center font-black text-[14px] shadow-lg">
+                  {s.n}
+                </div>
+                <div className="w-12 h-12 bg-[#F3F4F6] rounded-xl flex items-center justify-center mb-5">
+                  <s.icon size={22} className="text-[#111827]" />
+                </div>
+                <h3 className="text-[17px] font-bold text-[#0A0A0A] mb-2">{s.title}</h3>
+                <p className="text-[13px] text-[#6B7280] leading-relaxed">{s.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* FEATURES */}
-      <section id="fonctionnalites" className="py-24 px-6">
+      <section id="fonctionnalites" className="py-24 px-6 bg-[#F9FAFB]">
         <div className="max-w-6xl mx-auto">
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-16">
             <p className="text-[12px] font-bold text-[#9CA3AF] uppercase tracking-widest mb-3">FONCTIONNALITÉS</p>
-            <h2 className="text-[40px] font-black text-[#0A0A0A] tracking-tight">Tout ce qu'il vous faut,<br/>rien de superflu.</h2>
+            <h2 className="text-[40px] font-black text-[#0A0A0A] tracking-tight">Tout ce qu'il faut.<br/>Rien d'autre.</h2>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
             {features.map((f, i) => (
               <motion.div key={i}
                 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
@@ -317,9 +405,9 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                 className="bg-white border border-[#E5E7EB] rounded-2xl p-6 hover:shadow-lg hover:border-[#111827]/20 transition-all cursor-default group"
               >
                 <div className="w-10 h-10 bg-[#F3F4F6] group-hover:bg-[#111827] rounded-xl flex items-center justify-center mb-4 transition-colors">
-                  <f.icon size={18} className="text-[#6B7280] group-hover:text-white transition-colors" />
+                  <f.icon size={18} className="text-[#111827] group-hover:text-white transition-colors" />
                 </div>
-                <h3 className="text-[15px] font-semibold text-[#0A0A0A] mb-2">{f.title}</h3>
+                <h3 className="text-[15px] font-bold text-[#0A0A0A] mb-2">{f.title}</h3>
                 <p className="text-[13px] text-[#6B7280] leading-relaxed">{f.desc}</p>
               </motion.div>
             ))}
@@ -328,94 +416,97 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
       </section>
 
       {/* PRICING */}
-      <section id="tarifs" className="py-24 px-6 bg-[#F9FAFB]">
-        <div className="max-w-5xl mx-auto">
+      <section id="tarifs" className="py-24 px-6">
+        <div className="max-w-4xl mx-auto">
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-16">
             <p className="text-[12px] font-bold text-[#9CA3AF] uppercase tracking-widest mb-3">TARIFS</p>
             <h2 className="text-[40px] font-black text-[#0A0A0A] tracking-tight">Simple et transparent.</h2>
-            <p className="text-[15px] text-[#6B7280] mt-3">Commencez gratuitement. Évoluez quand vous êtes prêt.</p>
+            <p className="text-[14px] text-[#6B7280] mt-3 max-w-md mx-auto">
+              Activation par clé. Demandez votre clé sur WhatsApp, payez par Wave/Orange Money, débloquez instantanément.
+            </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-            {plans.map((plan, i) => {
-              const isDark = plan.popular || plan.enterprise;
-              return (
-                <motion.div key={plan.id}
-                  initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.1 }} viewport={{ once: true }}
-                  className={`relative rounded-2xl p-6 flex flex-col ${
-                    plan.enterprise
-                      ? 'bg-gradient-to-br from-[#0A0A0A] to-[#1F2937] text-white ring-1 ring-amber-500/30'
-                      : plan.popular
-                        ? 'bg-[#111827] text-white ring-2 ring-[#111827]'
-                        : 'bg-white border border-[#E5E7EB]'
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {plans.map((p, i) => (
+              <motion.div key={p.id}
+                initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.1 }} viewport={{ once: true }}
+                className={`relative rounded-2xl p-8 border ${p.popular ? 'bg-[#0A0A0A] text-white border-[#0A0A0A]' : 'bg-white border-[#E5E7EB]'}`}
+              >
+                {p.popular && (
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-400 text-[#0A0A0A] text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full">
+                    Populaire
+                  </span>
+                )}
+                <p className={`text-[12px] font-bold uppercase tracking-widest mb-2 ${p.popular ? 'text-white/50' : 'text-[#9CA3AF]'}`}>{p.name}</p>
+                <div className="flex items-baseline gap-1 mb-6">
+                  <span className={`text-[44px] font-black tracking-tight ${p.popular ? 'text-white' : 'text-[#0A0A0A]'}`}>{p.price}</span>
+                  <span className={`text-[13px] ${p.popular ? 'text-white/50' : 'text-[#9CA3AF]'}`}>{p.period}</span>
+                </div>
+
+                <ul className="space-y-3 mb-8">
+                  {p.features.map((feat, fi) => (
+                    <li key={fi} className="flex items-start gap-2.5 text-[13px]">
+                      <CheckCircle2 size={15} className={`mt-0.5 shrink-0 ${p.popular ? 'text-emerald-400' : 'text-emerald-500'}`} />
+                      <span className={p.popular ? 'text-white/80' : 'text-[#374151]'}>{feat}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <button
+                  onClick={() => planCta(p.action, p.name)}
+                  className={`w-full h-12 rounded-xl font-semibold text-[14px] transition-all flex items-center justify-center gap-2 ${
+                    p.popular
+                      ? 'bg-white text-[#0A0A0A] hover:bg-white/90'
+                      : 'bg-[#111827] text-white hover:bg-[#1F2937]'
                   }`}
                 >
-                  {plan.popular && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-400 text-[#111827] text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider">
-                      Le plus populaire
-                    </div>
-                  )}
-                  {plan.enterprise && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider">
-                      Sur mesure
-                    </div>
-                  )}
-                  <p className={`text-[12px] font-bold uppercase tracking-widest mb-1 ${isDark ? 'text-white/50' : 'text-[#9CA3AF]'}`}>{plan.name}</p>
-                  <div className="flex items-end gap-1 mb-1">
-                    <span className={`font-black font-mono ${plan.enterprise ? 'text-[22px]' : 'text-[36px]'}`}>{plan.price}</span>
-                    {plan.period && (
-                      <span className={`text-[13px] mb-1.5 ${isDark ? 'text-white/50' : 'text-[#9CA3AF]'}`}>
-                        {plan.id === 'starter' ? 'FCFA' : 'FCFA'}{plan.period}
-                      </span>
-                    )}
-                  </div>
-                  {plan.enterprise && <p className="text-[11px] text-white/40 mb-1">à partir de 75 000 FCFA / mois</p>}
-                  <div className={`border-t mb-5 mt-4 ${isDark ? 'border-white/10' : 'border-[#F3F4F6]'}`} />
-                  <ul className="space-y-2.5 mb-6 flex-1">
-                    {plan.features.map((feat, fi) => (
-                      <li key={fi} className="flex items-start gap-2.5 text-[13px]">
-                        <CheckCircle2 size={14} className={`flex-shrink-0 mt-0.5 ${plan.enterprise ? 'text-amber-400' : isDark ? 'text-emerald-400' : 'text-emerald-600'}`} />
-                        <span className={isDark ? 'text-white/80' : 'text-[#374151]'}>{feat}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <button onClick={onGetStarted}
-                    className={`w-full py-3 rounded-xl text-[13px] font-semibold transition-all ${
-                      plan.enterprise
-                        ? 'bg-amber-500 text-white hover:bg-amber-600'
-                        : plan.popular
-                          ? 'bg-white text-[#111827] hover:bg-white/90'
-                          : 'bg-[#111827] text-white hover:bg-[#1F2937]'
-                    }`}>
-                    {plan.cta}
-                  </button>
-                </motion.div>
-              );
-            })}
+                  {p.action === 'whatsapp' ? <MessageCircle size={15} /> : <ArrowRight size={15} />}
+                  {p.cta}
+                </button>
+              </motion.div>
+            ))}
           </div>
+
+          {/* Business / Enterprise pointer */}
+          <motion.div
+            initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}
+            className="mt-8 text-center bg-[#F9FAFB] border border-[#F3F4F6] rounded-2xl p-6"
+          >
+            <p className="text-[13px] text-[#6B7280]">
+              Besoin de plus ? Plans <strong className="text-[#111827]">Business</strong> (15 000 FCFA) et <strong className="text-[#111827]">Enterprise</strong> (sur devis) disponibles sur demande WhatsApp.
+            </p>
+            <a
+              href={`${WHATSAPP_URL}?text=${encodeURIComponent('Bonjour, je voudrais en savoir plus sur les plans Business / Enterprise.')}`}
+              target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 mt-3 text-[13px] font-semibold text-[#25D366] hover:underline"
+            >
+              <MessageCircle size={14} /> Nous contacter
+            </a>
+          </motion.div>
         </div>
       </section>
 
       {/* TESTIMONIALS */}
-      <section id="temoignages" className="py-24 px-6">
-        <div className="max-w-5xl mx-auto">
+      <section id="temoignages" className="py-24 px-6 bg-[#F9FAFB]">
+        <div className="max-w-6xl mx-auto">
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-16">
-            <p className="text-[12px] font-bold text-[#9CA3AF] uppercase tracking-widest mb-3">TÉMOIGNAGES</p>
-            <h2 className="text-[40px] font-black text-[#0A0A0A] tracking-tight">Ils nous font confiance.</h2>
+            <p className="text-[12px] font-bold text-[#9CA3AF] uppercase tracking-widest mb-3">ILS NOUS FONT CONFIANCE</p>
+            <h2 className="text-[40px] font-black text-[#0A0A0A] tracking-tight">Des PME, des freelances,<br/>des résultats.</h2>
           </motion.div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {testimonials.map((t, i) => (
               <motion.div key={i}
                 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }} viewport={{ once: true }}
+                transition={{ delay: i * 0.08 }} viewport={{ once: true }}
                 className="bg-white border border-[#E5E7EB] rounded-2xl p-6"
               >
-                <div className="flex gap-0.5 mb-4">{[1,2,3,4,5].map(s=><Star key={s} size={13} className="text-amber-400 fill-amber-400"/>)}</div>
-                <p className="text-[14px] text-[#374151] leading-relaxed mb-4">"{t.text}"</p>
+                <div className="flex gap-0.5 mb-4">{[...Array(t.stars)].map((_, k) => <Star key={k} size={13} className="text-amber-400 fill-amber-400"/>)}</div>
+                <p className="text-[14px] text-[#374151] leading-relaxed mb-5">"{t.text}"</p>
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-[#111827] flex items-center justify-center text-[10px] text-white font-bold">
-                    {t.name.split(' ').map(n=>n[0]).join('')}
+                  <div className="w-9 h-9 rounded-full bg-[#111827] text-white flex items-center justify-center text-[11px] font-bold">
+                    {t.name.split(' ').map(w => w[0]).join('')}
                   </div>
                   <div>
                     <p className="text-[13px] font-semibold text-[#0A0A0A]">{t.name}</p>
@@ -431,20 +522,27 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
       {/* CTA FINAL */}
       <section className="py-24 px-6">
         <motion.div
-          initial={{ opacity: 0, scale: 0.97 }} whileInView={{ opacity: 1, scale: 1 }}
-          viewport={{ once: true }}
-          className="max-w-3xl mx-auto bg-[#111827] rounded-3xl p-12 text-center text-white relative overflow-hidden"
+          initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+          className="max-w-3xl mx-auto bg-[#0A0A0A] rounded-3xl p-12 text-center text-white relative overflow-hidden"
         >
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-          <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+          <div className="absolute inset-0 opacity-20" style={{
+            backgroundImage: 'radial-gradient(circle at 50% 0%, #25D366 0%, transparent 60%)',
+          }} />
           <div className="relative">
-            <p className="text-[12px] font-bold text-white/40 uppercase tracking-widest mb-3">PRÊT À COMMENCER ?</p>
-            <h2 className="text-[36px] font-black tracking-tight mb-4">Créez votre première<br/>facture en 2 minutes.</h2>
-            <p className="text-[14px] text-white/60 mb-8">Aucune carte de crédit requise. Gratuit pendant 14 jours.</p>
-            <button onClick={onGetStarted}
-              className="inline-flex items-center gap-2 bg-white text-[#111827] text-[14px] font-bold px-8 py-4 rounded-xl hover:bg-white/90 transition-all shadow-xl">
-              Démarrer gratuitement <ArrowRight size={16} />
-            </button>
+            <h2 className="text-[36px] font-black tracking-tight mb-4">Votre prochaine facture<br/>en 30 secondes.</h2>
+            <p className="text-[14px] text-white/60 mb-8 max-w-md mx-auto">
+              Essai gratuit 30 jours. Aucune carte de crédit. Aucune obligation.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button onClick={onGetStarted}
+                className="flex items-center justify-center gap-2 bg-white text-[#0A0A0A] text-[14px] font-semibold px-6 py-3.5 rounded-xl hover:bg-white/90 transition-all">
+                Créer mon compte gratuit <ArrowRight size={16} />
+              </button>
+              <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 bg-[#25D366] text-white text-[14px] font-semibold px-6 py-3.5 rounded-xl hover:bg-[#1FAD54] transition-all">
+                <MessageCircle size={16} /> Demander une clé
+              </a>
+            </div>
           </div>
         </motion.div>
       </section>
@@ -452,11 +550,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
       {/* FOOTER */}
       <footer className="bg-[#0A0A0A] text-white px-6 pt-16 pb-8">
         <div className="max-w-6xl mx-auto">
-
-          {/* Colonnes principales */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 pb-12 border-b border-white/10">
-
-            {/* Marque — col large */}
             <div className="lg:col-span-2">
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
@@ -466,36 +560,30 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                 <span className="text-[11px] font-bold text-white/30 bg-white/10 px-2 py-0.5 rounded-full">.ci</span>
               </div>
               <p className="text-[13px] text-white/50 leading-relaxed max-w-xs mb-6">
-                La solution de facturation conçue pour les PME et entrepreneurs de Côte d'Ivoire. Conforme DGI, simple et puissante.
+                Facture, PDF, WhatsApp. La solution la plus simple pour facturer en Côte d'Ivoire.
               </p>
-              {/* Badges */}
               <div className="flex flex-wrap gap-2">
                 <span className="inline-flex items-center gap-1.5 bg-white/10 text-white/70 text-[11px] font-medium px-3 py-1.5 rounded-full">
                   <ShieldCheck size={12} className="text-emerald-400" /> Conforme DGI-CI
                 </span>
                 <span className="inline-flex items-center gap-1.5 bg-white/10 text-white/70 text-[11px] font-medium px-3 py-1.5 rounded-full">
-                  <Zap size={12} className="text-amber-400" /> Wave intégré
+                  <MessageCircle size={12} className="text-[#25D366]" /> WhatsApp natif
                 </span>
               </div>
             </div>
 
-            {/* Produit */}
             <div>
               <p className="text-[11px] font-bold text-white/30 uppercase tracking-widest mb-4">Produit</p>
               <ul className="space-y-3">
                 {[
-                  { label: 'Fonctionnalités', id: 'fonctionnalites' },
-                  { label: 'Tarifs',          id: 'tarifs' },
-                  { label: 'Témoignages',     id: 'temoignages' },
-                  { label: 'Tableau de bord', id: null },
-                  { label: 'Export DGI',      id: null },
+                  { label: 'Comment ça marche', id: 'workflow' },
+                  { label: 'Fonctionnalités',  id: 'fonctionnalites' },
+                  { label: 'Tarifs',           id: 'tarifs' },
+                  { label: 'Témoignages',      id: 'temoignages' },
                 ].map(item => (
                   <li key={item.label}>
                     <button
-                      onClick={() => item.id
-                        ? document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth' })
-                        : onGetStarted()
-                      }
+                      onClick={() => document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth' })}
                       className="text-[13px] text-white/50 hover:text-white transition-colors"
                     >
                       {item.label}
@@ -505,19 +593,17 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               </ul>
             </div>
 
-            {/* Ressources */}
             <div>
               <p className="text-[11px] font-bold text-white/30 uppercase tracking-widest mb-4">Ressources</p>
               <ul className="space-y-3">
                 <li><button onClick={() => setActiveModal('documentation')} className="text-[13px] text-white/50 hover:text-white transition-colors text-left">Documentation</button></li>
                 <li><button onClick={() => setActiveModal('dgi')} className="text-[13px] text-white/50 hover:text-white transition-colors text-left">Guide DGI Côte d'Ivoire</button></li>
-                <li><button onClick={() => toast.info('Blog bientôt disponible — restez connecté !')} className="text-[13px] text-white/50 hover:text-white transition-colors text-left">Blog</button></li>
                 <li><button onClick={() => setActiveModal('faq')} className="text-[13px] text-white/50 hover:text-white transition-colors text-left">FAQ</button></li>
                 <li><button onClick={() => setActiveModal('statut')} className="text-[13px] text-white/50 hover:text-white transition-colors text-left">Statut du service</button></li>
+                <li><button onClick={() => toast.info('Blog bientôt disponible.')} className="text-[13px] text-white/50 hover:text-white transition-colors text-left">Blog</button></li>
               </ul>
             </div>
 
-            {/* Contact */}
             <div>
               <p className="text-[11px] font-bold text-white/30 uppercase tracking-widest mb-4">Contact</p>
               <ul className="space-y-3">
@@ -527,13 +613,11 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                   </a>
                 </li>
                 <li>
-                  <a href="tel:+2250700000000" className="text-[13px] text-white/50 hover:text-white transition-colors">
-                    +225 07 00 00 00 00
+                  <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="text-[13px] text-white/50 hover:text-white transition-colors flex items-center gap-1.5">
+                    <MessageCircle size={12} /> WhatsApp
                   </a>
                 </li>
-                <li>
-                  <p className="text-[13px] text-white/50">Abidjan, Cocody<br/>Côte d'Ivoire</p>
-                </li>
+                <li><p className="text-[13px] text-white/50">Abidjan, Cocody<br/>Côte d'Ivoire</p></li>
               </ul>
               <div className="mt-6">
                 <p className="text-[11px] font-bold text-white/30 uppercase tracking-widest mb-3">Nous suivre</p>
@@ -541,7 +625,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                   {[
                     { label: 'LI', href: 'https://www.linkedin.com/company/factura-ci', title: 'LinkedIn' },
                     { label: 'TW', href: 'https://x.com/factura_ci', title: 'Twitter / X' },
-                    { label: 'WA', href: 'https://wa.me/2250700000000', title: 'WhatsApp' },
+                    { label: 'WA', href: WHATSAPP_URL, title: 'WhatsApp' },
                   ].map(s => (
                     <a key={s.label} href={s.href} title={s.title} target="_blank" rel="noopener noreferrer"
                       className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-[10px] font-black text-white/60 hover:text-white transition-all">
@@ -553,10 +637,9 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             </div>
           </div>
 
-          {/* Barre de bas */}
           <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-[12px] text-white/30">
-              © 2026 Factura.ci — Fait avec ❤️ pour les entrepreneurs ivoiriens.
+              © 2026 Factura.ci — Fait pour les entrepreneurs ivoiriens.
             </p>
             <div className="flex items-center gap-6 flex-wrap justify-center">
               <button onClick={() => setActiveModal('confidentialite')} className="text-[12px] text-white/30 hover:text-white/70 transition-colors">Confidentialité</button>
@@ -565,7 +648,6 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               <a href="mailto:support@factura.ci" className="text-[12px] text-white/30 hover:text-white/70 transition-colors">Support</a>
             </div>
           </div>
-
         </div>
       </footer>
 
@@ -577,31 +659,31 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               <h2 className="text-[20px] font-bold text-[#111827]">Documentation</h2>
 
               <ModalSection title="1. Créer votre compte">
-                <p>Cliquez sur « Démarrer gratuitement », renseignez vos informations d'entreprise (nom, NCC, adresse) et accédez immédiatement à votre tableau de bord. Aucune carte de crédit requise.</p>
+                <p>Cliquez sur « Démarrer gratuitement », renseignez vos informations d'entreprise (nom, NCC, adresse). Essai gratuit 30 jours, aucune carte requise.</p>
               </ModalSection>
 
-              <ModalSection title="2. Créer votre première facture">
-                <p>Allez dans <strong>Factures → Nouvelle facture</strong>. Sélectionnez un client (ou créez-en un nouveau), ajoutez vos lignes de produits ou services. La TVA à 18% est calculée automatiquement. Téléchargez le PDF ou envoyez-le directement.</p>
+              <ModalSection title="2. Créer votre première facture ou devis">
+                <p>Allez dans <strong>Factures → Nouvelle facture</strong> (ou <strong>Devis</strong>). Sélectionnez un client, ajoutez vos lignes. La TVA 18% est calculée automatiquement. Le PDF est généré instantanément.</p>
               </ModalSection>
 
-              <ModalSection title="3. Gérer vos clients">
-                <p>Dans la section <strong>Clients</strong>, ajoutez le NCC de chaque client entreprise. L'historique complet des factures par client est automatiquement disponible.</p>
+              <ModalSection title="3. Imprimer ou télécharger le PDF">
+                <p>Depuis la fiche facture, bouton <strong>Télécharger PDF</strong> ou <strong>Imprimer</strong>. Le document inclut votre logo, NCC, RCCM et tous les éléments légaux requis par la DGI.</p>
               </ModalSection>
 
-              <ModalSection title="4. Suivre vos paiements">
-                <p>La section <strong>Paiements</strong> centralise toutes vos encaissements. Vous pouvez enregistrer les paiements reçus par Wave, Orange Money, MTN Money, virement ou espèces.</p>
+              <ModalSection title="4. Envoyer la facture sur WhatsApp">
+                <p>Bouton <strong>Envoyer WhatsApp</strong> sur la facture. Le client reçoit le PDF directement dans sa conversation, prêt à régler.</p>
               </ModalSection>
 
-              <ModalSection title="5. Export DGI">
-                <p>Allez dans <strong>Export DGI</strong>, sélectionnez le mois concerné et téléchargez votre registre mensuel conforme à la DGI-CI. À effectuer avant le 15 du mois suivant.</p>
+              <ModalSection title="5. Activer un plan payant">
+                <p>Demandez une clé d'activation par WhatsApp. Payez par Wave / Orange Money / MTN Money. Vous recevez un code <code className="bg-[#F3F4F6] px-1.5 py-0.5 rounded text-[12px]">XXXX-XXXX-XXXX-XXXX</code> à coller dans l'app. Plan actif instantanément.</p>
               </ModalSection>
 
-              <ModalSection title="6. Assistant IA (plans Pro & Business)">
-                <p>Cliquez sur le bouton ✨ en bas à droite de l'interface. L'assistant FACTURAI connaît vos données en temps réel et répond à toutes vos questions : comptabilité, relances, fiscalité ivoirienne.</p>
+              <ModalSection title="6. Export DGI">
+                <p>Section <strong>Export DGI</strong>, sélectionnez le mois, téléchargez votre registre mensuel. À déposer avant le 15 du mois suivant.</p>
               </ModalSection>
 
               <div className="pt-2 border-t border-[#F3F4F6]">
-                <p className="text-[12px] text-[#9CA3AF]">Pour toute question : <a href="mailto:support@factura.ci" className="text-[#111827] underline">support@factura.ci</a></p>
+                <p className="text-[12px] text-[#9CA3AF]">Question ? <a href="mailto:support@factura.ci" className="text-[#111827] underline">support@factura.ci</a></p>
               </div>
             </div>
           )}
@@ -646,14 +728,14 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             <div className="space-y-5">
               <h2 className="text-[20px] font-bold text-[#111827]">Questions fréquentes</h2>
               {[
-                { q: 'Le plan Gratuit est-il vraiment sans limite de temps ?', a: 'Oui, le plan Gratuit est à vie. Vous pouvez créer jusqu\'à 5 factures et 3 devis par mois sans jamais payer.' },
-                { q: 'Puis-je passer au plan Pro ou Business à tout moment ?', a: 'Oui, la mise à niveau est instantanée depuis la page Tarifs. Vous payez au mois, sans engagement. En cas de retour au plan Gratuit, vos données sont conservées.' },
-                { q: 'Mes données sont-elles sécurisées ?', a: 'Vos données sont hébergées sur Supabase (infrastructure AWS Paris) avec chiffrement TLS et sauvegardes quotidiennes. Nous ne partageons jamais vos données avec des tiers.' },
-                { q: 'Le PDF généré est-il accepté par la DGI-CI ?', a: 'Oui. Nos factures incluent tous les éléments requis : NCC vendeur et acheteur, TVA 18% détaillée, numérotation séquentielle, date d\'émission et d\'échéance.' },
-                { q: 'Quels moyens de paiement pour l\'abonnement ?', a: 'Wave, Orange Money et MTN Money. Aucune carte bancaire requise. Paiement mensuel sans engagement.' },
-                { q: 'Comment fonctionne l\'assistant IA ?', a: 'L\'assistant FACTURAI (plans Pro et Business) analyse vos données en temps réel — factures, clients, paiements — et répond à vos questions en français. Il connaît la fiscalité ivoirienne et peut rédiger des relances.' },
-                { q: 'Puis-je annuler mon abonnement ?', a: 'Oui, à tout moment depuis la page Paramètres. Aucun frais d\'annulation. Vous conservez l\'accès jusqu\'à la fin de la période payée.' },
-                { q: 'Plusieurs utilisateurs peuvent-ils accéder au même compte ?', a: 'La gestion multi-utilisateurs est disponible sur le plan Business (jusqu\'à 5 utilisateurs). Les plans Gratuit et Pro sont mono-utilisateur.' },
+                { q: "Que fait FACTURA exactement ?", a: "FACTURA génère des factures et devis professionnels en PDF, conformes DGI-CI, et permet de les envoyer directement à vos clients via WhatsApp. Rien de plus, rien de moins." },
+                { q: "Le plan Gratuit est-il vraiment sans limite de temps ?", a: "Oui, le plan Gratuit est à vie (5 factures et 3 devis par mois). En plus, vous avez 30 jours d'essai sans restriction au démarrage." },
+                { q: "Comment fonctionne l'activation par clé ?", a: "Vous demandez une clé sur WhatsApp, payez par Wave/Orange Money/MTN, recevez un code XXXX-XXXX-XXXX-XXXX, le collez dans l'app. Le plan est actif instantanément." },
+                { q: "Comment j'envoie une facture sur WhatsApp ?", a: "Depuis la facture créée, cliquez sur 'Envoyer WhatsApp'. Le PDF s'ouvre dans la conversation WhatsApp avec le numéro de votre client pré-rempli." },
+                { q: "Mes données sont-elles sécurisées ?", a: "Vos données sont hébergées sur Supabase (AWS Paris) avec chiffrement TLS et sauvegardes quotidiennes. Nous ne partageons jamais vos données." },
+                { q: "Le PDF généré est-il accepté par la DGI-CI ?", a: "Oui. Nos factures incluent tous les éléments requis : NCC vendeur et acheteur, TVA 18% détaillée, numérotation séquentielle." },
+                { q: "Quels moyens de paiement pour activer mon plan ?", a: "Wave, Orange Money, MTN Money. Aucune carte bancaire requise." },
+                { q: "Puis-je arrêter à tout moment ?", a: "Oui. À l'expiration de votre clé, vous repassez au plan Gratuit. Vos données sont conservées. Pas de renouvellement automatique." },
               ].map(({ q, a }) => (
                 <div key={q} className="border-b border-[#F3F4F6] pb-4 last:border-0">
                   <p className="text-[14px] font-semibold text-[#111827] mb-1.5">{q}</p>
@@ -673,15 +755,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               </div>
 
               <div className="space-y-2">
-                {[
-                  'API Factura',
-                  'Base de données',
-                  'Génération PDF',
-                  'Authentification',
-                  'Assistant IA',
-                  'Paiements mobile money',
-                  'Export DGI',
-                ].map(service => (
+                {['API Factura','Base de données','Génération PDF','Authentification','Export DGI','Activation par clé'].map(service => (
                   <div key={service} className="flex items-center justify-between py-3 border-b border-[#F3F4F6] last:border-0">
                     <span className="text-[14px] text-[#374151]">{service}</span>
                     <span className="flex items-center gap-1.5 text-[13px] font-semibold text-emerald-600">
@@ -718,23 +792,23 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               </ModalSection>
 
               <ModalSection title="2. Utilisation de vos données">
-                <p>Vos données sont utilisées exclusivement pour fournir les services FACTURA : génération de documents, calcul de statistiques financières, assistance IA, et amélioration du service.</p>
+                <p>Vos données sont utilisées exclusivement pour fournir les services FACTURA : génération de documents, export DGI et amélioration du service.</p>
               </ModalSection>
 
               <ModalSection title="3. Stockage et sécurité">
-                <p>Données hébergées sur Supabase (AWS eu-west-1, Paris). Chiffrement TLS en transit, AES-256 au repos. Sauvegardes quotidiennes. Accès restreint aux seuls employés autorisés.</p>
+                <p>Données hébergées sur Supabase (AWS eu-west-1, Paris). Chiffrement TLS en transit, AES-256 au repos. Sauvegardes quotidiennes.</p>
               </ModalSection>
 
               <ModalSection title="4. Partage de données">
-                <p>Nous ne vendons ni ne partageons vos données avec des tiers, sauf obligation légale (requête judiciaire) ou prestataires techniques (Supabase, Vercel) dans le cadre strict du service.</p>
+                <p>Nous ne vendons ni ne partageons vos données avec des tiers, sauf obligation légale ou prestataires techniques (Supabase, Vercel) dans le cadre strict du service.</p>
               </ModalSection>
 
               <ModalSection title="5. Vos droits">
-                <p>Vous pouvez à tout moment demander l'accès, la rectification ou la suppression de vos données en contactant <a href="mailto:support@factura.ci" className="text-[#111827] underline">support@factura.ci</a>. Délai de traitement : 72h.</p>
+                <p>Accès, rectification, suppression à tout moment via <a href="mailto:support@factura.ci" className="text-[#111827] underline">support@factura.ci</a>. Délai 72h.</p>
               </ModalSection>
 
               <ModalSection title="6. Cookies">
-                <p>FACTURA utilise uniquement des cookies techniques nécessaires au fonctionnement du service (session d'authentification). Aucun cookie publicitaire ni de tracking tiers.</p>
+                <p>FACTURA utilise uniquement des cookies techniques nécessaires au fonctionnement du service. Aucun cookie publicitaire.</p>
               </ModalSection>
             </div>
           )}
@@ -745,36 +819,37 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               <p className="text-[12px] text-[#9CA3AF]">En vigueur au 1er mai 2026</p>
 
               <ModalSection title="1. Objet">
-                <p>Les présentes CGU régissent l'utilisation de la plateforme FACTURA accessible sur factura-zwrz.vercel.app, éditée par FACTURA CI SARL, entreprise de droit ivoirien.</p>
+                <p>Les présentes CGU régissent l'utilisation de la plateforme FACTURA, éditée par FACTURA CI SARL, entreprise de droit ivoirien.</p>
               </ModalSection>
 
               <ModalSection title="2. Accès au service">
-                <p>L'accès requiert la création d'un compte avec une adresse email valide. Vous êtes responsable de la confidentialité de vos identifiants et de toutes les actions effectuées depuis votre compte.</p>
+                <p>L'accès requiert la création d'un compte. Vous êtes responsable de la confidentialité de vos identifiants.</p>
               </ModalSection>
 
-              <ModalSection title="3. Plans et facturation">
+              <ModalSection title="3. Plans et activation">
                 <ul className="space-y-1 text-[13px] text-[#6B7280] mt-1">
-                  <li>• Plan Gratuit : accès limité, sans engagement, sans expiration</li>
-                  <li>• Plans payants : facturation mensuelle, sans engagement, résiliation à tout moment</li>
-                  <li>• En cas de non-renouvellement, le compte est rétrogradé au plan Gratuit</li>
+                  <li>• Plan Gratuit : 5 factures et 3 devis / mois, sans engagement</li>
+                  <li>• Essai 30 jours sans restriction à la création du compte</li>
+                  <li>• Plans payants : activation par clé prépayée, durée fixe choisie</li>
+                  <li>• À expiration de la clé, le compte repasse au plan Gratuit</li>
                   <li>• Aucun remboursement pour la période déjà entamée</li>
                 </ul>
               </ModalSection>
 
               <ModalSection title="4. Utilisation acceptable">
-                <p>Vous vous engagez à utiliser FACTURA uniquement pour des activités légales. Toute tentative de fraude, d'accès non autorisé ou d'utilisation abusive entraîne la résiliation immédiate du compte.</p>
+                <p>Vous vous engagez à utiliser FACTURA uniquement pour des activités légales. Toute fraude entraîne la résiliation immédiate du compte.</p>
               </ModalSection>
 
               <ModalSection title="5. Propriété intellectuelle">
-                <p>La plateforme FACTURA, sa marque et ses contenus sont la propriété exclusive de FACTURA CI SARL. Toute reproduction ou utilisation sans autorisation écrite préalable est interdite.</p>
+                <p>La plateforme FACTURA, sa marque et ses contenus sont la propriété exclusive de FACTURA CI SARL.</p>
               </ModalSection>
 
               <ModalSection title="6. Limitation de responsabilité">
-                <p>FACTURA s'engage à maintenir une disponibilité maximale du service mais ne peut garantir une disponibilité de 100%. Notre responsabilité est limitée au montant des abonnements payés sur les 3 derniers mois.</p>
+                <p>FACTURA s'engage à maintenir une disponibilité maximale du service. Notre responsabilité est limitée au montant des activations payées sur les 3 derniers mois.</p>
               </ModalSection>
 
               <ModalSection title="7. Droit applicable">
-                <p>Les présentes CGU sont soumises au droit ivoirien. En cas de litige, les parties s'engagent à rechercher une solution amiable. À défaut, les tribunaux d'Abidjan sont seuls compétents.</p>
+                <p>Droit ivoirien. Tribunaux d'Abidjan en cas de litige non résolu à l'amiable.</p>
               </ModalSection>
             </div>
           )}
@@ -788,23 +863,23 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                   <p><strong className="text-[#374151]">FACTURA CI SARL</strong></p>
                   <p>Siège social : Abidjan, Cocody, Côte d'Ivoire</p>
                   <p>Email : <a href="mailto:contact@factura.ci" className="text-[#111827] underline">contact@factura.ci</a></p>
-                  <p>Téléphone : +225 07 00 00 00 00</p>
+                  <p>WhatsApp : <a href={WHATSAPP_URL} className="text-[#111827] underline">+225 07 00 00 00 00</a></p>
                 </div>
               </ModalSection>
 
               <ModalSection title="Hébergement">
                 <div className="space-y-1 text-[13px] text-[#6B7280]">
-                  <p><strong className="text-[#374151]">Site web :</strong> Vercel Inc., 340 Pine Street Suite 700, San Francisco, CA 94104, USA</p>
-                  <p><strong className="text-[#374151]">Base de données :</strong> Supabase Inc., hébergée sur AWS eu-west-1 (Paris, France)</p>
+                  <p><strong className="text-[#374151]">Site web :</strong> Vercel Inc., San Francisco, CA, USA</p>
+                  <p><strong className="text-[#374151]">Base de données :</strong> Supabase Inc., AWS eu-west-1 (Paris, France)</p>
                 </div>
               </ModalSection>
 
               <ModalSection title="Propriété intellectuelle">
-                <p>L'ensemble du contenu de ce site (textes, images, code source, marque FACTURA) est protégé par le droit ivoirien de la propriété intellectuelle. Toute reproduction, même partielle, est interdite sans autorisation écrite préalable.</p>
+                <p>L'ensemble du contenu de ce site est protégé par le droit ivoirien de la propriété intellectuelle.</p>
               </ModalSection>
 
               <ModalSection title="Données personnelles">
-                <p>Conformément à la réglementation en vigueur sur la protection des données personnelles en Côte d'Ivoire, vous disposez d'un droit d'accès, de rectification et de suppression de vos données personnelles. Pour exercer ces droits : <a href="mailto:support@factura.ci" className="text-[#111827] underline">support@factura.ci</a></p>
+                <p>Conformément à la réglementation en vigueur, vous disposez d'un droit d'accès, de rectification et de suppression de vos données : <a href="mailto:support@factura.ci" className="text-[#111827] underline">support@factura.ci</a></p>
               </ModalSection>
 
               <ModalSection title="Crédits techniques">

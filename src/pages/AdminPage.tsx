@@ -33,7 +33,7 @@ const LEAD_STATUS = [
 export function AdminPage() {
   const { user } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
-  const [tab, setTab] = useState<'overview' | 'users' | 'leads' | 'activity' | 'settings'>('overview');
+  const [tab, setTab] = useState<'overview' | 'users' | 'leads' | 'activity' | 'keys' | 'settings'>('overview');
 
   // Stats
   const [stats, setStats] = useState({
@@ -85,6 +85,14 @@ export function AdminPage() {
     success: boolean; latency: number; tokens: number; model: string; response: string; timestamp: string;
   } | null>(null);
 
+  // Keys (activation system)
+  const [keys, setKeys] = useState<any[]>([]);
+  const [loadingKeys, setLoadingKeys] = useState(false);
+  const [activationEnforced, setActivationEnforced] = useState(false);
+  const [keyForm, setKeyForm] = useState<{ plan: string; duration_minutes: number; notes: string }>({ plan: 'pro', duration_minutes: 30 * 1440, notes: '' });
+  const [generatingKey, setGeneratingKey] = useState(false);
+  const [justGenerated, setJustGenerated] = useState<{ code: string; plan: string; duration_minutes: number } | null>(null);
+
   // Layout
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sidebar-collapsed') === 'true');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -98,6 +106,7 @@ export function AdminPage() {
   useEffect(() => {
     if (tab === 'settings' && isAdmin) { fetchAdmins(); fetchAiConfig(); }
   }, [tab, isAdmin]);
+  useEffect(() => { if (tab === 'keys' && isAdmin) { fetchKeys(); fetchEnforced(); } }, [tab, isAdmin]);
 
   async function fetchStats() {
     setLoadingStats(true);
@@ -303,6 +312,79 @@ export function AdminPage() {
     } catch (e: any) { toast.error(e.message); }
   }
 
+  async function fetchKeys() {
+    setLoadingKeys(true);
+    try {
+      const { data, error } = await supabase
+        .from('activation_keys')
+        .select('*, used_company:companies!activation_keys_used_by_fkey(name)')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      setKeys(data || []);
+    } catch (e: any) { toast.error('Clés: ' + e.message); }
+    finally { setLoadingKeys(false); }
+  }
+
+  async function fetchEnforced() {
+    try {
+      const { data } = await supabase.from('platform_settings').select('value').eq('key', 'activation_enforced').maybeSingle();
+      setActivationEnforced((data?.value || 'false') === 'true');
+    } catch { /* noop */ }
+  }
+
+  async function toggleEnforced() {
+    const next = !activationEnforced;
+    try {
+      const { error } = await supabase.from('platform_settings').upsert(
+        { key: 'activation_enforced', value: next ? 'true' : 'false', updated_at: new Date().toISOString() },
+        { onConflict: 'key' }
+      );
+      if (error) throw error;
+      setActivationEnforced(next);
+      toast.success(next ? 'Activation OBLIGATOIRE pour tous.' : 'Activation désactivée (kill switch OFF).');
+    } catch (e: any) { toast.error(e.message); }
+  }
+
+  async function generateKey() {
+    setGeneratingKey(true);
+    try {
+      const { data, error } = await supabase.rpc('admin_generate_key', {
+        p_plan: keyForm.plan,
+        p_duration_minutes: keyForm.duration_minutes,
+        p_notes: keyForm.notes || null,
+      });
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+      setJustGenerated({ code: row.code, plan: keyForm.plan, duration_minutes: keyForm.duration_minutes });
+      setKeyForm(f => ({ ...f, notes: '' }));
+      fetchKeys();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setGeneratingKey(false); }
+  }
+
+  function formatDuration(minutes: number): string {
+    if (minutes < 60)         return `${minutes} min`;
+    if (minutes < 1440)       return `${Math.round(minutes / 60)} h`;
+    return `${Math.round(minutes / 1440)} j`;
+  }
+
+  async function revokeKey(id: string) {
+    try {
+      const { error } = await supabase.rpc('admin_revoke_key', { p_key_id: id });
+      if (error) throw error;
+      toast.success('Clé révoquée.');
+      fetchKeys();
+    } catch (e: any) { toast.error(e.message); }
+  }
+
+  async function copyCode(code: string) {
+    try {
+      await navigator.clipboard.writeText(code);
+      toast.success('Code copié dans le presse-papier.');
+    } catch { toast.error('Copie impossible.'); }
+  }
+
   async function updateLeadStatus(id: string, status: string) {
     try {
       const { error } = await supabase.from('enterprise_leads').update({ status }).eq('id', id);
@@ -349,6 +431,7 @@ export function AdminPage() {
     { id: 'users',     label: 'Utilisateurs', icon: Users },
     { id: 'leads',     label: 'Leads',        icon: MessageSquare },
     { id: 'activity',  label: 'Activité',     icon: Activity },
+    { id: 'keys',      label: 'Clés',         icon: Key },
     { id: 'settings',  label: 'Paramètres',   icon: Settings },
   ] as const;
 
@@ -746,6 +829,177 @@ export function AdminPage() {
                           </div>
                         </div>
                       ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── CLÉS D'ACTIVATION ── */}
+          {tab === 'keys' && (
+            <div className="space-y-6">
+              {/* Kill switch */}
+              <div className={`rounded-2xl border p-5 flex items-center justify-between ${activationEnforced ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
+                <div>
+                  <p className={`text-[13px] font-bold ${activationEnforced ? 'text-red-700' : 'text-amber-700'}`}>
+                    {activationEnforced ? 'Activation OBLIGATOIRE (kill switch ON)' : 'Activation désactivée (kill switch OFF)'}
+                  </p>
+                  <p className={`text-[12px] mt-0.5 ${activationEnforced ? 'text-red-600' : 'text-amber-600'}`}>
+                    {activationEnforced
+                      ? 'Les utilisateurs sans abonnement valide voient la page d\'activation.'
+                      : 'Les utilisateurs ont accès libre. Active ce switch pour bloquer.'}
+                  </p>
+                </div>
+                <button
+                  onClick={toggleEnforced}
+                  className={`h-10 px-4 rounded-xl text-[13px] font-semibold transition-colors ${activationEnforced ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-[#111827] text-white hover:bg-[#1F2937]'}`}
+                >
+                  {activationEnforced ? 'Désactiver le blocage' : 'Activer le blocage'}
+                </button>
+              </div>
+
+              {/* Generator */}
+              <div className="bg-white rounded-2xl border border-[#F3F4F6] shadow-sm overflow-hidden">
+                <div className="p-5 border-b border-[#F3F4F6]">
+                  <h2 className="text-[14px] font-bold text-[#0A0A0A]">Générer une nouvelle clé</h2>
+                  <p className="text-[12px] text-[#9CA3AF] mt-0.5">Choisis le plan + la durée. La clé est unique et utilisable une seule fois.</p>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-[11px] font-bold text-[#374151] uppercase tracking-widest">Plan</label>
+                      <CustomSelect
+                        size="sm"
+                        value={keyForm.plan}
+                        onChange={v => setKeyForm(f => ({ ...f, plan: v }))}
+                        options={[
+                          { value: 'starter',    label: 'Starter (gratuit)' },
+                          { value: 'pro',        label: 'Pro' },
+                          { value: 'business',   label: 'Business' },
+                          { value: 'enterprise', label: 'Enterprise' },
+                        ]}
+                        className="mt-1.5"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-[#374151] uppercase tracking-widest">Durée</label>
+                      <CustomSelect
+                        size="sm"
+                        value={String(keyForm.duration_minutes)}
+                        onChange={v => setKeyForm(f => ({ ...f, duration_minutes: parseInt(v) || 43200 }))}
+                        options={[
+                          { value: '5',      label: '5 minutes (test)' },
+                          { value: '30',     label: '30 minutes (test)' },
+                          { value: '60',     label: '1 heure' },
+                          { value: '1440',   label: '1 jour' },
+                          { value: '10080',  label: '7 jours' },
+                          { value: '43200',  label: '30 jours (1 mois)' },
+                          { value: '129600', label: '90 jours (3 mois)' },
+                          { value: '259200', label: '180 jours (6 mois)' },
+                          { value: '525600', label: '365 jours (1 an)' },
+                        ]}
+                        className="mt-1.5"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-[#374151] uppercase tracking-widest">Note (optionnel)</label>
+                      <input
+                        type="text"
+                        value={keyForm.notes}
+                        onChange={e => setKeyForm(f => ({ ...f, notes: e.target.value }))}
+                        placeholder="Ex: client Boutique Aïcha"
+                        className="w-full h-9 mt-1.5 px-3 text-[13px] border border-[#E5E7EB] rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-[#111827]"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={generateKey}
+                    disabled={generatingKey}
+                    className="flex items-center gap-2 h-10 px-5 bg-[#111827] text-white text-[13px] font-semibold rounded-xl hover:bg-[#1F2937] disabled:opacity-50 transition-all"
+                  >
+                    {generatingKey
+                      ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      : <Plus size={14} />}
+                    Générer la clé
+                  </button>
+
+                  {justGenerated && (
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">Clé générée — {justGenerated.plan} · {formatDuration(justGenerated.duration_minutes)}</p>
+                        <p className="text-[18px] font-mono font-bold text-emerald-800 mt-1 tracking-wider break-all">{justGenerated.code}</p>
+                      </div>
+                      <button onClick={() => copyCode(justGenerated.code)}
+                        className="shrink-0 h-9 px-4 bg-white border border-emerald-300 rounded-lg text-[12px] font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors">
+                        Copier
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Keys list */}
+              <div className="bg-white rounded-2xl border border-[#F3F4F6] shadow-sm overflow-hidden">
+                <div className="p-5 border-b border-[#F3F4F6]">
+                  <h2 className="text-[14px] font-bold text-[#0A0A0A]">{keys.length} clé{keys.length > 1 ? 's' : ''} générée{keys.length > 1 ? 's' : ''}</h2>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[13px]">
+                    <thead className="bg-[#F9FAFB] border-b border-[#F3F4F6]">
+                      <tr>
+                        {['Code', 'Plan', 'Durée', 'Statut', 'Utilisée par', 'Note', 'Action'].map(h => (
+                          <th key={h} className="text-left py-3 px-4 text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loadingKeys
+                        ? [1,2,3].map(i => (
+                            <tr key={i}><td colSpan={7} className="py-3 px-4">
+                              <div className="h-8 bg-[#F9FAFB] rounded animate-pulse" />
+                            </td></tr>
+                          ))
+                        : keys.length === 0
+                        ? <tr><td colSpan={7} className="py-16 text-center text-[#9CA3AF] text-[13px]">Aucune clé générée pour le moment.</td></tr>
+                        : keys.map((k: any) => {
+                            const used    = !!k.used_at;
+                            const revoked = !!k.revoked_at;
+                            const statusLabel = revoked ? 'Révoquée' : used ? 'Utilisée' : 'Disponible';
+                            const statusColor = revoked ? 'bg-red-100 text-red-700'
+                                              : used    ? 'bg-gray-200 text-gray-600'
+                                                        : 'bg-emerald-100 text-emerald-700';
+                            return (
+                              <tr key={k.id} className="border-b border-[#F9FAFB] hover:bg-[#F9FAFB] transition-colors">
+                                <td className="py-3 px-4 font-mono text-[12px] font-bold text-[#0A0A0A]">{k.code}</td>
+                                <td className="py-3 px-4">
+                                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${PLAN_COLORS[k.plan] || 'bg-gray-100 text-gray-600'}`}>
+                                    {PLAN_LABEL[k.plan as keyof typeof PLAN_LABEL] || k.plan}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4 text-[#6B7280] whitespace-nowrap">{formatDuration(k.duration_minutes || (k.duration_days * 1440))}</td>
+                                <td className="py-3 px-4">
+                                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${statusColor}`}>{statusLabel}</span>
+                                </td>
+                                <td className="py-3 px-4 text-[#6B7280]">{k.used_company?.name || (used ? '—' : '')}</td>
+                                <td className="py-3 px-4 text-[#9CA3AF] text-[12px] max-w-[200px] truncate">{k.notes || '—'}</td>
+                                <td className="py-3 px-4 whitespace-nowrap">
+                                  {!used && !revoked && (
+                                    <div className="flex gap-1.5">
+                                      <button onClick={() => copyCode(k.code)}
+                                        className="h-8 px-3 text-[12px] font-medium border border-[#E5E7EB] rounded-lg hover:border-[#111827] hover:bg-white transition-colors text-[#374151]">
+                                        Copier
+                                      </button>
+                                      <button onClick={() => revokeKey(k.id)}
+                                        className="h-8 px-3 text-[12px] font-medium border border-red-200 text-red-500 rounded-lg hover:bg-red-50 transition-colors">
+                                        Révoquer
+                                      </button>
+                                    </div>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
