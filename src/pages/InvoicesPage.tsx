@@ -216,6 +216,7 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
     let icon = null;
     switch (status) {
       case 'paid': label = 'Payée'; icon = <CheckCircle2 size={12} className="mr-1" />; break;
+      case 'partial': label = 'Acompte versé'; icon = <Clock size={12} className="mr-1" />; break;
       case 'overdue': label = 'En retard'; icon = <AlertCircle size={12} className="mr-1" />; break;
       case 'sent': label = 'Envoyée'; icon = <Send size={12} className="mr-1" />; break;
       case 'draft': label = 'Brouillon'; break;
@@ -269,6 +270,8 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
               <TableHead className="font-bold">Client</TableHead>
               <TableHead className="font-bold">Date d'émission</TableHead>
               <TableHead className="font-bold">Montant TTC</TableHead>
+              <TableHead className="font-bold">Payé</TableHead>
+              <TableHead className="font-bold">Reste</TableHead>
               <TableHead className="font-bold">Statut</TableHead>
               <TableHead className="text-right font-bold">Actions</TableHead>
             </TableRow>
@@ -276,13 +279,13 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-48 text-center text-slate-500">
+                <TableCell colSpan={8} className="h-48 text-center text-slate-500">
                   Chargement des documents...
                 </TableCell>
               </TableRow>
             ) : invoices.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-72 text-center">
+                <TableCell colSpan={8} className="h-72 text-center">
                   <div className="flex flex-col items-center justify-center space-y-4">
                     <div className="bg-slate-50 p-6 rounded-full text-slate-200">
                       <FileText size={64} />
@@ -297,7 +300,10 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
                 </TableCell>
               </TableRow>
             ) : (
-              displayInvoices.map((inv) => (
+              displayInvoices.map((inv) => {
+                const paid = (inv.payments || []).reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
+                const remaining = Math.max(0, Number(inv.total_ttc || 0) - paid);
+                return (
                 <TableRow key={inv.id} className="hover:bg-slate-50/50 transition-colors cursor-pointer group" onClick={() => setPreviewInvoice(inv)}>
                   <TableCell className="font-black text-slate-900">
                     {inv.number}
@@ -310,6 +316,12 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
                   </TableCell>
                   <TableCell className="font-black text-slate-900 lg:text-base">
                     {inv.total_ttc.toLocaleString('fr-FR')} FCFA
+                  </TableCell>
+                  <TableCell className="font-mono text-[13px] text-emerald-600 font-bold">
+                    {paid > 0 ? `${paid.toLocaleString('fr-FR')} FCFA` : '—'}
+                  </TableCell>
+                  <TableCell className={`font-mono text-[13px] font-bold ${remaining === 0 && paid > 0 ? 'text-emerald-600' : remaining > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
+                    {remaining === 0 && paid > 0 ? 'Soldé' : remaining > 0 ? `${remaining.toLocaleString('fr-FR')} FCFA` : '—'}
                   </TableCell>
                   <TableCell>
                     {getStatusBadge(inv.status)}
@@ -361,12 +373,12 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
                             <MessageSquare size={16} className="mr-3 text-emerald-600" /> Relancer par WhatsApp
                           </DropdownMenuItem>
                           
-                          {inv.status !== 'paid' && (
+                          {inv.status !== 'paid' && inv.status !== 'canceled' && (
                             <DropdownMenuItem
                               className="rounded-xl px-3 py-2.5 cursor-pointer text-emerald-600 font-bold"
                               onClick={() => openPayDialog(inv)}
                             >
-                              <CheckCircle2 size={16} className="mr-3" /> Marquer comme payée
+                              <CheckCircle2 size={16} className="mr-3" /> Enregistrer paiement / acompte
                             </DropdownMenuItem>
                           )}
 
@@ -405,7 +417,8 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))
+                );
+              })
             )}
           </TableBody>
         </Table>
