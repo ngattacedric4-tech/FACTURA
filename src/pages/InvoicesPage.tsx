@@ -86,7 +86,7 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
     try {
       const { data, error } = await supabase
         .from('invoices')
-        .select('*, clients(*), invoice_items(*)')
+        .select('*, clients(*), invoice_items(*), payments(id, amount, method, reference, payment_date)')
         .eq('company_id', company?.id)
         .eq('type', filterType)
         .order('created_at', { ascending: false });
@@ -160,6 +160,11 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
     try {
       const amount = parseFloat(payAmount);
       if (!amount || amount <= 0) throw new Error('Montant invalide');
+      const alreadyPaid = (payingInvoice.payments || []).reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
+      const total = Number(payingInvoice.total_ttc || 0);
+      const remaining = total - alreadyPaid;
+      if (amount > remaining + 0.5) throw new Error(`Montant supérieur au reste à payer (${remaining.toLocaleString('fr-FR')} FCFA)`);
+
       const { error: pErr } = await supabase.from('payments').insert({
         invoice_id: payingInvoice.id,
         amount,
@@ -168,10 +173,11 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
         payment_date: new Date(payDate).toISOString(),
       });
       if (pErr) throw pErr;
-      const { error: iErr } = await supabase.from('invoices').update({ status: 'paid', updated_at: new Date().toISOString() }).eq('id', payingInvoice.id);
-      if (iErr) throw iErr;
-      toast.success('Paiement enregistré.');
+      // Le trigger postgres recalcule automatiquement invoices.status (sent → partial → paid)
+      const newPaid = alreadyPaid + amount;
+      toast.success(newPaid >= total ? 'Paiement complet enregistré.' : `Acompte de ${amount.toLocaleString('fr-FR')} FCFA enregistré. Reste : ${(total - newPaid).toLocaleString('fr-FR')} FCFA.`);
       setPayingInvoice(null);
+      setPayAmount(''); setPayRef('');
       fetchInvoices();
     } catch(e:any) {
       toast.error(e.message || 'Erreur enregistrement paiement');
@@ -426,12 +432,45 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
       <Dialog open={!!payingInvoice} onOpenChange={(o)=>{ if(!o) setPayingInvoice(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Enregistrer un paiement</DialogTitle>
+            <DialogTitle>Enregistrer un paiement / acompte</DialogTitle>
           </DialogHeader>
+          {payingInvoice && (() => {
+            const total = Number(payingInvoice.total_ttc || 0);
+            const paid = (payingInvoice.payments || []).reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
+            const remaining = total - paid;
+            return (
+              <div className="bg-[#F9FAFB] border border-[#F3F4F6] rounded-xl p-4 grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <p className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider">Total TTC</p>
+                  <p className="text-[13px] font-bold text-[#0A0A0A] font-mono mt-0.5">{total.toLocaleString('fr-FR')}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Déjà payé</p>
+                  <p className="text-[13px] font-bold text-emerald-700 font-mono mt-0.5">{paid.toLocaleString('fr-FR')}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Reste</p>
+                  <p className="text-[13px] font-bold text-amber-700 font-mono mt-0.5">{remaining.toLocaleString('fr-FR')}</p>
+                </div>
+              </div>
+            );
+          })()}
           <form onSubmit={handlePaySubmit} className="space-y-4">
             <div className="space-y-2">
               <Label>Montant (FCFA)</Label>
-              <Input type="number" step="1" required value={payAmount} onChange={e=>setPayAmount(e.target.value)} />
+              <div className="flex gap-2">
+                <Input type="number" step="1" required value={payAmount} onChange={e=>setPayAmount(e.target.value)} className="flex-1" />
+                {payingInvoice && (() => {
+                  const total = Number(payingInvoice.total_ttc || 0);
+                  const paid = (payingInvoice.payments || []).reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
+                  const remaining = total - paid;
+                  return (
+                    <Button type="button" variant="outline" onClick={() => setPayAmount(String(remaining))} className="shrink-0 h-10 text-[12px]">
+                      Solde complet
+                    </Button>
+                  );
+                })()}
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Méthode de paiement</Label>
