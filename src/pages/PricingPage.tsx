@@ -3,14 +3,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Check, Sparkles, Crown } from 'lucide-react';
-import { CheckoutModal } from '@/components/CheckoutModal';
+import { Check, Sparkles, Crown, MessageCircle, KeyRound } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlan } from '@/hooks/usePlan';
+import { useActivation } from '@/hooks/useActivation';
 import { toast } from 'sonner';
 import { PLAN_LABEL } from '@/lib/plans';
 import { CustomSelect } from '@/components/ui/CustomSelect';
+
+const WHATSAPP_NUMBER = '2250104617601';
 
 interface CheckoutData { plan: 'pro' | 'business'; planName: string; price: string; }
 interface Props { onNavigate: (page: string) => void; onStartCheckout?: (data: CheckoutData) => void; }
@@ -35,7 +37,8 @@ const TIERS: TierCard[] = [
       "Jusqu'à 10 clients",
       "Jusqu'à 20 produits",
       'PDF avec marque FACTURA',
-      'Historique 30 jours',
+      'Envoi WhatsApp inclus',
+      'Essai 30 jours sans restriction',
     ],
     cta: 'Plan actuel',
   },
@@ -45,53 +48,71 @@ const TIERS: TierCard[] = [
       'Factures & devis illimités',
       'Clients & produits illimités',
       'PDF sans marque + logo perso',
+      'Envoi WhatsApp 1-clic',
       'Export DGI mensuel',
-      'Historique illimité',
       'Support email 48h',
     ],
-    cta: 'Passer à Pro', highlight: true,
+    cta: 'Demander une clé', highlight: true,
   },
   {
     id: 'business', name: 'Business', price: '15 000 FCFA', priceNote: '/ mois',
     features: [
       'Tout Pro inclus',
-      "5 utilisateurs",
-      'Agent IA WhatsApp (relances + réponses clients 24/7)',
-      'Analyses IA prédictives (impayés, opportunités)',
+      '5 utilisateurs',
+      'Assistant IA intégré',
       'Relances WhatsApp auto',
-      'API + webhooks',
       'Support prioritaire 24h',
     ],
-    cta: 'Passer à Business',
+    cta: 'Demander une clé',
   },
   {
     id: 'enterprise', name: 'Enterprise', price: 'Sur devis',
     features: [
       'Tout Business inclus',
-      'Agent IA WhatsApp personnalisé (entraîné sur vos données)',
-      'Analyses IA avancées + tableaux de bord sur mesure',
       'Multi-entreprises',
       'Utilisateurs illimités + rôles',
-      'SSO Google / Microsoft',
-      'Intégrations Sage / SAP / Odoo',
-      'SLA 99.9% + support dédié 24/7',
-      'Account manager nommé',
-      'Onboarding & formation sur site',
+      'Account manager dédié',
+      'SLA 99.9% + support 24/7',
     ],
     cta: 'Contacter le commercial', enterprise: true,
   },
 ];
 
-export function PricingPage({ onNavigate, onStartCheckout }: Props) {
+const ERROR_MESSAGES: Record<string, string> = {
+  key_not_found: 'Code introuvable. Vérifiez la saisie.',
+  key_revoked: 'Ce code a été révoqué. Contactez le support.',
+  key_already_used: 'Ce code a déjà été utilisé.',
+  invalid_code_format: 'Format invalide. 16 caractères hexadécimaux requis.',
+  no_company: "Aucune entreprise associée.",
+  not_authenticated: 'Session expirée. Reconnectez-vous.',
+};
+
+function translateError(raw: string): string {
+  const m = raw.match(/[a-z_]+$/i);
+  const key = m ? m[0] : raw;
+  return ERROR_MESSAGES[key] || raw;
+}
+
+export function PricingPage(_props: Props) {
   const { user, company } = useAuth();
-  const { plan: currentPlan } = usePlan();
-  const [checkoutPlan, setCheckoutPlan] = useState<TierCard | null>(null);
+  const { plan: currentPlan, refresh: refreshPlan } = usePlan();
+  const { expiresAt, refresh: refreshActivation } = useActivation();
+
   const [leadOpen, setLeadOpen] = useState(false);
   const [leadSubmitting, setLeadSubmitting] = useState(false);
   const [lead, setLead] = useState({
     full_name: '', email: user?.email || '', phone: '',
     company_name: company?.name || '', company_size: '50-200', message: '',
   });
+
+  const [activateOpen, setActivateOpen] = useState(false);
+  const [code, setCode] = useState('');
+  const [submittingCode, setSubmittingCode] = useState(false);
+
+  function formatCodeInput(raw: string): string {
+    const clean = raw.replace(/[^0-9A-Fa-f]/g, '').toUpperCase().slice(0, 16);
+    return clean.replace(/(.{4})(?=.)/g, '$1-');
+  }
 
   async function submitLead(e: React.FormEvent) {
     e.preventDefault();
@@ -105,11 +126,35 @@ export function PricingPage({ onNavigate, onStartCheckout }: Props) {
     finally { setLeadSubmitting(false); }
   }
 
+  function whatsappKey(tier: TierCard) {
+    const msg = encodeURIComponent(
+      `Bonjour, je souhaite une clé d'activation FACTURA — plan ${tier.name} (${tier.price}${tier.priceNote || ''}). Entreprise : ${company?.name || '—'}.`
+    );
+    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`, '_blank', 'noopener,noreferrer');
+  }
+
   function handleCta(tier: TierCard) {
     if (tier.id === currentPlan) return;
     if (tier.enterprise) { setLeadOpen(true); return; }
-    if (tier.id === 'starter') { toast.info('Vous êtes déjà sur le plan Gratuit.'); return; }
-    setCheckoutPlan(tier);
+    if (tier.id === 'starter') { toast.info('Vous êtes déjà sur le plan Gratuit ou un plan supérieur.'); return; }
+    whatsappKey(tier);
+  }
+
+  async function submitCode(e: React.FormEvent) {
+    e.preventDefault();
+    if (submittingCode) return;
+    setSubmittingCode(true);
+    try {
+      const { data, error } = await supabase.rpc('activate_company', { p_code: code });
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+      toast.success(`Plan ${row?.plan || ''} activé jusqu'au ${new Date(row?.expires_at).toLocaleDateString('fr-FR')}.`);
+      setCode('');
+      setActivateOpen(false);
+      await Promise.all([refreshPlan(), refreshActivation()]);
+    } catch (err: any) {
+      toast.error(translateError(err.message || ''));
+    } finally { setSubmittingCode(false); }
   }
 
   const labelCls = "text-[11px] font-bold text-[#374151] uppercase tracking-widest";
@@ -119,11 +164,33 @@ export function PricingPage({ onNavigate, onStartCheckout }: Props) {
       <div className="text-center space-y-2">
         <h1 className="text-[28px] font-bold text-[#0A0A0A] tracking-tight">Tarifs</h1>
         <p className="text-[14px] text-[#6B7280] max-w-xl mx-auto">
-          Démarrez gratuitement. Évoluez quand votre activité grandit. Plan Enterprise sur mesure pour les grandes structures.
+          Activation par clé. Demandez votre code sur WhatsApp, payez par Wave / Orange Money / MTN, activez instantanément.
         </p>
         <p className="text-[12px] text-[#9CA3AF]">
-          Plan actuel: <span className="font-semibold text-[#111827]">{PLAN_LABEL[currentPlan]}</span>
+          Plan actuel : <span className="font-semibold text-[#111827]">{PLAN_LABEL[currentPlan]}</span>
+          {expiresAt && (
+            <> · expire le <span className="font-semibold text-[#111827]">{new Date(expiresAt).toLocaleDateString('fr-FR')}</span></>
+          )}
         </p>
+      </div>
+
+      {/* Bandeau : "J'ai déjà une clé" */}
+      <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+            <KeyRound size={18} className="text-emerald-700" />
+          </div>
+          <div>
+            <p className="text-[13px] font-semibold text-emerald-800">Vous avez déjà une clé d'activation ?</p>
+            <p className="text-[12px] text-emerald-700 mt-0.5">Activez-la directement ici pour débloquer votre plan.</p>
+          </div>
+        </div>
+        <Button
+          onClick={() => setActivateOpen(true)}
+          className="h-10 px-5 bg-emerald-600 hover:bg-emerald-700 text-white text-[13px] font-semibold rounded-xl shrink-0"
+        >
+          Activer ma clé
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -176,16 +243,17 @@ export function PricingPage({ onNavigate, onStartCheckout }: Props) {
               <Button
                 onClick={() => handleCta(t)}
                 disabled={isCurrent}
-                className={`w-full h-11 rounded-xl text-[13px] font-semibold transition-all ${
+                className={`w-full h-11 rounded-xl text-[13px] font-semibold transition-all flex items-center justify-center gap-2 ${
                   isCurrent
                     ? 'bg-[#F3F4F6] text-[#9CA3AF] hover:bg-[#F3F4F6] cursor-not-allowed'
                     : t.enterprise
                       ? 'bg-amber-500 hover:bg-amber-600 text-white'
                       : t.highlight
-                        ? 'bg-[#111827] hover:bg-[#1F2937] text-white'
+                        ? 'bg-[#25D366] hover:bg-[#1FAD54] text-white'
                         : 'bg-[#F9FAFB] hover:bg-[#F3F4F6] text-[#111827] border border-[#E5E7EB]'
                 }`}
               >
+                {!isCurrent && !t.enterprise && t.id !== 'starter' && <MessageCircle size={14} />}
                 {isCurrent ? 'Plan actuel' : t.cta}
               </Button>
             </div>
@@ -193,23 +261,45 @@ export function PricingPage({ onNavigate, onStartCheckout }: Props) {
         })}
       </div>
 
-      {checkoutPlan && checkoutPlan.id !== 'starter' && checkoutPlan.id !== 'enterprise' && (
-        <CheckoutModal
-          plan={{
-            id: checkoutPlan.id as 'pro' | 'business',
-            name: checkoutPlan.name,
-            price: checkoutPlan.price,
-            priceNote: checkoutPlan.priceNote || '',
-            features: checkoutPlan.features,
-          }}
-          onClose={() => setCheckoutPlan(null)}
-          onStartCheckout={(data) => {
-            setCheckoutPlan(null);
-            onStartCheckout?.(data);
-          }}
-        />
-      )}
+      {/* Activation Dialog */}
+      <Dialog open={activateOpen} onOpenChange={setActivateOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound size={18} /> Activer une clé
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-[13px] text-[#6B7280]">
+            Collez le code à 16 caractères reçu par WhatsApp. Les tirets sont ajoutés automatiquement.
+          </p>
+          <form onSubmit={submitCode} className="space-y-4">
+            <div className="space-y-2">
+              <Label className={labelCls}>Clé d'activation</Label>
+              <input
+                type="text"
+                value={code}
+                onChange={e => setCode(formatCodeInput(e.target.value))}
+                placeholder="XXXX-XXXX-XXXX-XXXX"
+                autoFocus
+                autoComplete="off"
+                className="w-full h-12 px-4 text-[15px] font-mono tracking-widest text-center border border-[#E5E7EB] rounded-xl bg-[#F9FAFB] focus:outline-none focus:ring-1 focus:ring-[#111827] focus:bg-white uppercase"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setActivateOpen(false)}>Annuler</Button>
+              <Button
+                type="submit"
+                disabled={submittingCode || code.replace(/-/g, '').length !== 16}
+                className="bg-[#111827] hover:bg-[#1F2937] text-white disabled:opacity-50"
+              >
+                {submittingCode ? 'Activation...' : 'Activer'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
+      {/* Enterprise lead form */}
       <Dialog open={leadOpen} onOpenChange={setLeadOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
