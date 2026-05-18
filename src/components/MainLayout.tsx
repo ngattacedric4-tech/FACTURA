@@ -21,6 +21,7 @@ import { usePlan } from '@/hooks/usePlan';
 import { PLAN_LABEL } from '@/lib/plans';
 import { Button } from '@/components/ui/button';
 import { ExpirationBanner } from '@/components/ExpirationBanner';
+import { TestimonialPrompt } from '@/components/TestimonialPrompt';
 
 
 interface MainLayoutProps {
@@ -206,6 +207,7 @@ export function MainLayout({ children, onNavigate, currentPage }: MainLayoutProp
         <div className="lg:pt-0 pt-14 h-screen overflow-y-auto">
           <div className="p-4 lg:p-8 max-w-[1400px] mx-auto">
             <ExpirationBanner onNavigate={onNavigate} />
+            <TestimonialPrompt />
             {children}
           </div>
         </div>

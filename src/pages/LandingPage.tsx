@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabase';
 
 const WHATSAPP_NUMBER = '2250104617601';
 const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}`;
@@ -115,15 +116,48 @@ function MockInvoice() {
   );
 }
 
+interface LiveStats {
+  companies_count: number;
+  invoices_count: number;
+  testimonials_avg: number;
+  testimonials_count: number;
+}
+interface LiveTestimonial {
+  id: string;
+  author_name: string;
+  author_role: string | null;
+  content: string;
+  stars: number;
+  created_at: string;
+}
+
 export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [stats, setStats] = useState<LiveStats | null>(null);
+  const [testimonials, setTestimonials] = useState<LiveTestimonial[]>([]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', onScroll);
     return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // Live stats + témoignages approuvés
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const [statsRes, testsRes] = await Promise.all([
+        supabase.rpc('public_landing_stats'),
+        supabase.rpc('public_testimonials'),
+      ]);
+      if (!mounted) return;
+      const statsRow = Array.isArray(statsRes.data) ? statsRes.data[0] : statsRes.data;
+      if (statsRow) setStats(statsRow as LiveStats);
+      if (testsRes.data) setTestimonials(testsRes.data as LiveTestimonial[]);
+    })();
+    return () => { mounted = false; };
   }, []);
 
   const steps = [
@@ -193,11 +227,6 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
     },
   ];
 
-  const testimonials = [
-    { name: 'Kouamé Assi', role: 'Directeur, KA Digital', text: 'En 30 secondes j\'envoie une facture sur WhatsApp à mon client. Avant je perdais 10 minutes par facture.', stars: 5 },
-    { name: 'Aminata Diallo', role: 'Freelance Designer', text: 'Le PDF est nickel, conforme DGI, et part directement sur WhatsApp. Mes clients adorent.', stars: 5 },
-    { name: 'Jean-Baptiste Koné', role: 'Gérant, JBK Construction', text: 'Plus de mails perdus. WhatsApp + PDF = factures réglées en 2 jours au lieu de 2 semaines.', stars: 5 },
-  ];
 
   function planCta(action: 'signup' | 'whatsapp', planName: string) {
     if (action === 'signup') return onGetStarted();
@@ -313,21 +342,25 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                 </button>
               </motion.div>
 
-              <motion.div
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                transition={{ duration: 0.7, delay: 0.5 }}
-                className="flex items-center gap-4"
-              >
-                <div className="flex -space-x-2">
-                  {['KA','AD','JK','MB','CF'].map((initials, i) => (
-                    <div key={i} className="w-8 h-8 rounded-full bg-[#111827] border-2 border-white flex items-center justify-center text-[9px] text-white font-bold">{initials}</div>
-                  ))}
-                </div>
-                <div>
-                  <div className="flex gap-0.5 mb-0.5">{[1,2,3,4,5].map(i=><Star key={i} size={12} className="text-amber-400 fill-amber-400"/>)}</div>
-                  <p className="text-[12px] text-[#6B7280]"><strong className="text-[#111827]">500+</strong> PME ivoiriennes utilisent FACTURA</p>
-                </div>
-              </motion.div>
+              {stats && stats.companies_count > 0 && (
+                <motion.div
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                  transition={{ duration: 0.7, delay: 0.5 }}
+                  className="flex items-center gap-4"
+                >
+                  <div className="w-10 h-10 rounded-full bg-[#111827] border-2 border-white flex items-center justify-center text-[11px] text-white font-black">
+                    {stats.companies_count}
+                  </div>
+                  <div>
+                    {stats.testimonials_avg > 0 && (
+                      <div className="flex gap-0.5 mb-0.5">{[1,2,3,4,5].map(i => <Star key={i} size={12} className={i <= Math.round(Number(stats.testimonials_avg)) ? 'text-amber-400 fill-amber-400' : 'text-[#E5E7EB] fill-[#E5E7EB]'} />)}</div>
+                    )}
+                    <p className="text-[12px] text-[#6B7280]">
+                      <strong className="text-[#111827]">{stats.companies_count}</strong> entreprise{stats.companies_count > 1 ? 's' : ''} {stats.companies_count > 1 ? 'utilisent' : 'utilise'} FACTURA
+                    </p>
+                  </div>
+                </motion.div>
+              )}
             </div>
 
             <div className="hidden lg:flex items-center justify-center">
@@ -337,15 +370,15 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
         </div>
       </section>
 
-      {/* STATS */}
+      {/* STATS — chiffres en direct depuis la DB */}
       <section className="py-16 border-y border-[#F3F4F6] bg-[#F9FAFB]">
         <div className="max-w-6xl mx-auto px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {[
-              { value: 500,   suffix: '+', label: 'PME utilisatrices' },
-              { value: 12000, suffix: '+', label: 'Factures envoyées' },
-              { value: 30,    suffix: 's', label: 'Pour facturer un client' },
-              { value: 100,   suffix: '%', label: 'Conforme DGI-CI' },
+              { value: stats?.companies_count ?? 0,   suffix: '+',  label: 'Entreprises inscrites' },
+              { value: stats?.invoices_count  ?? 0,   suffix: '+',  label: 'Factures émises' },
+              { value: 30,                            suffix: 's',  label: 'Pour facturer un client' },
+              { value: 100,                           suffix: '%',  label: 'Conforme DGI-CI' },
             ].map((s, i) => (
               <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.1 }} viewport={{ once: true }}>
@@ -487,37 +520,44 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
         </div>
       </section>
 
-      {/* TESTIMONIALS */}
-      <section id="temoignages" className="py-24 px-6 bg-[#F9FAFB]">
-        <div className="max-w-6xl mx-auto">
-          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-16">
-            <p className="text-[12px] font-bold text-[#9CA3AF] uppercase tracking-widest mb-3">ILS NOUS FONT CONFIANCE</p>
-            <h2 className="text-[40px] font-black text-[#0A0A0A] tracking-tight">Des PME, des freelances,<br/>des résultats.</h2>
-          </motion.div>
+      {/* TESTIMONIALS — visible uniquement si avis approuvés en DB */}
+      {testimonials.length > 0 && (
+        <section id="temoignages" className="py-24 px-6 bg-[#F9FAFB]">
+          <div className="max-w-6xl mx-auto">
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-16">
+              <p className="text-[12px] font-bold text-[#9CA3AF] uppercase tracking-widest mb-3">ILS NOUS FONT CONFIANCE</p>
+              <h2 className="text-[40px] font-black text-[#0A0A0A] tracking-tight">Des PME, des freelances,<br/>des résultats.</h2>
+              {stats && stats.testimonials_avg > 0 && (
+                <p className="text-[13px] text-[#6B7280] mt-3">
+                  Note moyenne : <strong className="text-[#111827]">{Number(stats.testimonials_avg).toFixed(1)}/5</strong> · {stats.testimonials_count} avis vérifié{stats.testimonials_count > 1 ? 's' : ''}
+                </p>
+              )}
+            </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {testimonials.map((t, i) => (
-              <motion.div key={i}
-                initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.08 }} viewport={{ once: true }}
-                className="bg-white border border-[#E5E7EB] rounded-2xl p-6"
-              >
-                <div className="flex gap-0.5 mb-4">{[...Array(t.stars)].map((_, k) => <Star key={k} size={13} className="text-amber-400 fill-amber-400"/>)}</div>
-                <p className="text-[14px] text-[#374151] leading-relaxed mb-5">"{t.text}"</p>
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-[#111827] text-white flex items-center justify-center text-[11px] font-bold">
-                    {t.name.split(' ').map(w => w[0]).join('')}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {testimonials.map((t, i) => (
+                <motion.div key={t.id}
+                  initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.08 }} viewport={{ once: true }}
+                  className="bg-white border border-[#E5E7EB] rounded-2xl p-6"
+                >
+                  <div className="flex gap-0.5 mb-4">{[...Array(t.stars)].map((_, k) => <Star key={k} size={13} className="text-amber-400 fill-amber-400"/>)}</div>
+                  <p className="text-[14px] text-[#374151] leading-relaxed mb-5">"{t.content}"</p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-[#111827] text-white flex items-center justify-center text-[11px] font-bold">
+                      {t.author_name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-semibold text-[#0A0A0A]">{t.author_name}</p>
+                      {t.author_role && <p className="text-[11px] text-[#9CA3AF]">{t.author_role}</p>}
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-[13px] font-semibold text-[#0A0A0A]">{t.name}</p>
-                    <p className="text-[11px] text-[#9CA3AF]">{t.role}</p>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* CTA FINAL */}
       <section className="py-24 px-6">

@@ -6,7 +6,7 @@ import {
   Users, ReceiptText, CreditCard, TrendingUp,
   Building2, MessageSquare, Activity, Shield,
   AlertTriangle, LogOut, Settings, Search, Plus, Trash2,
-  ChevronLeft, ChevronRight, Menu, Key, Zap, CheckCircle2, XCircle,
+  ChevronLeft, ChevronRight, Menu, Key, Zap, CheckCircle2, XCircle, Star,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -33,7 +33,7 @@ const LEAD_STATUS = [
 export function AdminPage() {
   const { user } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
-  const [tab, setTab] = useState<'overview' | 'users' | 'leads' | 'activity' | 'keys' | 'settings'>('overview');
+  const [tab, setTab] = useState<'overview' | 'users' | 'leads' | 'activity' | 'keys' | 'reviews' | 'settings'>('overview');
 
   // Stats
   const [stats, setStats] = useState({
@@ -94,6 +94,11 @@ export function AdminPage() {
   const [justGenerated, setJustGenerated] = useState<{ code: string; plan: string; duration_minutes: number } | null>(null);
   const [keysFilter, setKeysFilter] = useState<'all' | 'available' | 'active' | 'expired' | 'revoked'>('all');
 
+  // Testimonials moderation
+  const [testimonials, setTestimonials] = useState<any[]>([]);
+  const [loadingTestimonials, setLoadingTestimonials] = useState(false);
+  const [testimonialsFilter, setTestimonialsFilter] = useState<'pending' | 'approved' | 'all'>('pending');
+
   // Layout
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sidebar-collapsed') === 'true');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -108,6 +113,7 @@ export function AdminPage() {
     if (tab === 'settings' && isAdmin) { fetchAdmins(); fetchAiConfig(); }
   }, [tab, isAdmin]);
   useEffect(() => { if (tab === 'keys' && isAdmin) { fetchKeys(); fetchEnforced(); } }, [tab, isAdmin]);
+  useEffect(() => { if (tab === 'reviews' && isAdmin) fetchTestimonials(); }, [tab, isAdmin]);
 
   // Realtime: refresh users + stats quand un abonnement ou une activation change
   useEffect(() => {
@@ -127,6 +133,9 @@ export function AdminPage() {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'activation_keys' }, () => {
         if (tab === 'keys') fetchKeys();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'testimonials' }, () => {
+        if (tab === 'reviews') fetchTestimonials();
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -410,6 +419,53 @@ export function AdminPage() {
     } catch (e: any) { toast.error(e.message); }
   }
 
+  async function fetchTestimonials() {
+    setLoadingTestimonials(true);
+    try {
+      const { data, error } = await supabase
+        .from('testimonials')
+        .select('*, companies(name, user_id)')
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      setTestimonials(data || []);
+    } catch (e: any) { toast.error('Avis: ' + e.message); }
+    finally { setLoadingTestimonials(false); }
+  }
+
+  async function approveTestimonial(id: string) {
+    try {
+      const { error } = await supabase
+        .from('testimonials')
+        .update({ approved: true, approved_at: new Date().toISOString(), approved_by: (await supabase.auth.getUser()).data.user?.id })
+        .eq('id', id);
+      if (error) throw error;
+      toast.success('Avis approuvé. Visible sur la landing.');
+      fetchTestimonials();
+    } catch (e: any) { toast.error(e.message); }
+  }
+
+  async function unapproveTestimonial(id: string) {
+    try {
+      const { error } = await supabase
+        .from('testimonials')
+        .update({ approved: false, approved_at: null, approved_by: null })
+        .eq('id', id);
+      if (error) throw error;
+      toast.success('Avis retiré de la landing.');
+      fetchTestimonials();
+    } catch (e: any) { toast.error(e.message); }
+  }
+
+  async function deleteTestimonial(id: string) {
+    try {
+      const { error } = await supabase.from('testimonials').delete().eq('id', id);
+      if (error) throw error;
+      toast.success('Avis supprimé.');
+      fetchTestimonials();
+    } catch (e: any) { toast.error(e.message); }
+  }
+
   async function copyCode(code: string) {
     try {
       await navigator.clipboard.writeText(code);
@@ -464,6 +520,7 @@ export function AdminPage() {
     { id: 'leads',     label: 'Leads',        icon: MessageSquare },
     { id: 'activity',  label: 'Activité',     icon: Activity },
     { id: 'keys',      label: 'Clés',         icon: Key },
+    { id: 'reviews',   label: 'Avis',         icon: Star },
     { id: 'settings',  label: 'Paramètres',   icon: Settings },
   ] as const;
 
@@ -1073,6 +1130,104 @@ export function AdminPage() {
                           })}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── AVIS / TESTIMONIALS ── */}
+          {tab === 'reviews' && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-2xl border border-[#F3F4F6] shadow-sm overflow-hidden">
+                <div className="p-5 border-b border-[#F3F4F6] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div>
+                    <h2 className="text-[14px] font-bold text-[#0A0A0A]">Modération des avis utilisateurs</h2>
+                    <p className="text-[12px] text-[#9CA3AF] mt-0.5">
+                      Approuvés visibles sur la landing page. Les avis sont demandés aux clients après 7 jours d'utilisation.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {(() => {
+                      const counts = {
+                        pending:  testimonials.filter(t => !t.approved).length,
+                        approved: testimonials.filter(t => t.approved).length,
+                        all:      testimonials.length,
+                      };
+                      const filters: { id: typeof testimonialsFilter; label: string; color: string }[] = [
+                        { id: 'pending',  label: `En attente (${counts.pending})`,   color: 'bg-amber-100 text-amber-700' },
+                        { id: 'approved', label: `Approuvés (${counts.approved})`,   color: 'bg-emerald-100 text-emerald-700' },
+                        { id: 'all',      label: `Tous (${counts.all})`,             color: 'bg-[#111827] text-white' },
+                      ];
+                      return filters.map(f => (
+                        <button key={f.id}
+                          onClick={() => setTestimonialsFilter(f.id)}
+                          className={`text-[11px] font-bold px-2.5 py-1 rounded-full transition-all ${
+                            testimonialsFilter === f.id ? f.color : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#E5E7EB]'
+                          }`}>
+                          {f.label}
+                        </button>
+                      ));
+                    })()}
+                  </div>
+                </div>
+
+                <div className="divide-y divide-[#F3F4F6]">
+                  {loadingTestimonials ? (
+                    [1,2,3].map(i => <div key={i} className="p-5"><div className="h-16 bg-[#F9FAFB] rounded animate-pulse"/></div>)
+                  ) : testimonials.filter(t => testimonialsFilter === 'all' || (testimonialsFilter === 'approved' ? t.approved : !t.approved)).length === 0 ? (
+                    <div className="py-16 text-center text-[#9CA3AF] text-[13px]">
+                      {testimonialsFilter === 'pending' ? "Aucun avis en attente d'approbation." :
+                       testimonialsFilter === 'approved' ? "Aucun avis publié pour le moment." :
+                       "Aucun avis reçu."}
+                    </div>
+                  ) : (
+                    testimonials
+                      .filter(t => testimonialsFilter === 'all' || (testimonialsFilter === 'approved' ? t.approved : !t.approved))
+                      .map(t => (
+                        <div key={t.id} className="p-5 hover:bg-[#F9FAFB] transition-colors">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1.5">
+                                <div className="flex gap-0.5">
+                                  {[1,2,3,4,5].map(n => (
+                                    <Star key={n} size={13} className={n <= t.stars ? 'text-amber-400 fill-amber-400' : 'text-[#E5E7EB] fill-[#E5E7EB]'} />
+                                  ))}
+                                </div>
+                                <span className="text-[11px] text-[#9CA3AF]">·</span>
+                                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${t.approved ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                  {t.approved ? 'Publié' : 'En attente'}
+                                </span>
+                                <span className="text-[11px] text-[#9CA3AF]">·</span>
+                                <span className="text-[11px] text-[#9CA3AF]">{new Date(t.created_at).toLocaleDateString('fr-FR')}</span>
+                              </div>
+                              <p className="text-[13px] text-[#374151] leading-relaxed mb-2">"{t.content}"</p>
+                              <p className="text-[12px] font-semibold text-[#0A0A0A]">
+                                {t.author_name}
+                                {t.author_role && <span className="text-[#9CA3AF] font-normal"> · {t.author_role}</span>}
+                              </p>
+                              <p className="text-[11px] text-[#9CA3AF] mt-0.5">Entreprise : {t.companies?.name || '—'}</p>
+                            </div>
+                            <div className="shrink-0 flex flex-col gap-1.5">
+                              {t.approved ? (
+                                <button onClick={() => unapproveTestimonial(t.id)}
+                                  className="h-8 px-3 text-[12px] font-medium border border-amber-200 text-amber-700 rounded-lg hover:bg-amber-50 transition-colors">
+                                  Retirer
+                                </button>
+                              ) : (
+                                <button onClick={() => approveTestimonial(t.id)}
+                                  className="h-8 px-3 text-[12px] font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-1">
+                                  <CheckCircle2 size={12} /> Approuver
+                                </button>
+                              )}
+                              <button onClick={() => { if (confirm('Supprimer cet avis définitivement ?')) deleteTestimonial(t.id); }}
+                                className="h-8 px-3 text-[12px] font-medium border border-red-200 text-red-500 rounded-lg hover:bg-red-50 transition-colors">
+                                Supprimer
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                  )}
                 </div>
               </div>
             </div>
