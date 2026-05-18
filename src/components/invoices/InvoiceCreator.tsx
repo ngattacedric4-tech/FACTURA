@@ -69,6 +69,13 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
   const [isSaving, setIsSaving] = useState(false);
   const [invoiceNumber, setInvoiceNumber] = useState('');
 
+  // Acompte initial (optionnel) — créé en tant que ligne payments à l'enregistrement
+  const [hasAdvance, setHasAdvance] = useState(false);
+  const [advanceAmount, setAdvanceAmount] = useState<string>('');
+  const [advanceMethod, setAdvanceMethod] = useState<'wave'|'om'|'mtn'|'cash'|'transfer'|'check'>('cash');
+  const [advanceRef, setAdvanceRef] = useState<string>('');
+  const [advanceDate, setAdvanceDate] = useState<string>(new Date().toISOString().slice(0,10));
+
   useEffect(() => {
     if (company) {
       fetchData();
@@ -228,6 +235,27 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
       const { error: itemsError } = await supabase.from('invoice_items').insert(itemsToInsert);
       if (itemsError) throw itemsError;
 
+      // Acompte initial → ligne payments (le trigger DB recalcule le statut)
+      let createdPayments: any[] = [];
+      if (hasAdvance && !existingInvoice) {
+        const amount = parseFloat(advanceAmount);
+        if (amount > 0) {
+          if (amount > calculateTotal()) {
+            toast.error("L'acompte ne peut pas dépasser le total TTC.");
+          } else {
+            const { data: payData, error: payErr } = await supabase.from('payments').insert({
+              invoice_id: invoice.id,
+              amount,
+              method: advanceMethod,
+              reference: advanceRef || null,
+              payment_date: new Date(advanceDate).toISOString(),
+            }).select();
+            if (payErr) toast.error('Acompte non enregistré : ' + payErr.message);
+            else createdPayments = payData || [];
+          }
+        }
+      }
+
       // Stocker le document sauvegardé pour le PDF + WhatsApp
       const selectedClient = clients.find(c => c.id === selectedClientId);
       setSavedInvoice({
@@ -237,6 +265,7 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
           ...l,
           amount_ht: l.quantity * l.unit_price,
         })),
+        payments: createdPayments,
       });
 
       toast.success(`${type === 'invoice' ? 'Facture' : 'Devis'} enregistré avec succès !`);
@@ -576,12 +605,88 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
                 </div>
 
                 <div className="flex justify-between items-end pt-4 border-t-2 border-[#0A0A0A] mt-3">
-                  <span className="text-[14px] font-bold text-[#0A0A0A]">NET À PAYER</span>
+                  <span className="text-[14px] font-bold text-[#0A0A0A]">TOTAL TTC</span>
                   <span className="text-xl font-bold font-mono text-[#0A0A0A]">
                     {(calculateTotal() || 0).toLocaleString('fr-FR')} FCFA
                   </span>
                 </div>
               </div>
+
+              {/* Acompte initial — disponible uniquement à la création */}
+              {!savedInvoice && !existingInvoice && type === 'invoice' && (
+                <div className="mt-6 border-t border-[#F3F4F6] pt-4">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={hasAdvance}
+                      onChange={e => setHasAdvance(e.target.checked)}
+                      className="w-4 h-4 rounded border-[#E5E7EB] accent-[#111827]"
+                    />
+                    <span className="text-[13px] font-semibold text-[#111827]">Acompte initial reçu</span>
+                  </label>
+
+                  {hasAdvance && (
+                    <div className="mt-3 space-y-3 bg-[#F9FAFB] border border-[#F3F4F6] rounded-xl p-4">
+                      <div>
+                        <Label className="text-[10px] font-bold uppercase tracking-widest text-[#9CA3AF]">Montant (FCFA)</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={advanceAmount}
+                          onChange={e => setAdvanceAmount(e.target.value)}
+                          placeholder="Ex: 50000"
+                          className="h-10 mt-1 text-[13px]"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-[10px] font-bold uppercase tracking-widest text-[#9CA3AF]">Méthode</Label>
+                        <CustomSelect
+                          size="sm"
+                          value={advanceMethod}
+                          onChange={v => setAdvanceMethod(v as any)}
+                          options={[
+                            { value: 'cash',     label: 'Espèces' },
+                            { value: 'wave',     label: 'Wave' },
+                            { value: 'om',       label: 'Orange Money' },
+                            { value: 'mtn',      label: 'MTN Money' },
+                            { value: 'transfer', label: 'Virement' },
+                            { value: 'check',    label: 'Chèque' },
+                          ]}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-[10px] font-bold uppercase tracking-widest text-[#9CA3AF]">Référence (optionnel)</Label>
+                        <Input
+                          value={advanceRef}
+                          onChange={e => setAdvanceRef(e.target.value)}
+                          placeholder="N° transaction"
+                          className="h-10 mt-1 text-[13px]"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-[10px] font-bold uppercase tracking-widest text-[#9CA3AF]">Date</Label>
+                        <Input
+                          type="date"
+                          value={advanceDate}
+                          onChange={e => setAdvanceDate(e.target.value)}
+                          className="h-10 mt-1 text-[13px]"
+                        />
+                      </div>
+
+                      {parseFloat(advanceAmount) > 0 && (
+                        <div className="pt-2 border-t border-[#E5E7EB] flex justify-between items-baseline">
+                          <span className="text-[11px] font-bold uppercase tracking-widest text-amber-700">Reste à payer</span>
+                          <span className="text-[14px] font-bold font-mono text-amber-700">
+                            {Math.max(0, calculateTotal() - parseFloat(advanceAmount || '0')).toLocaleString('fr-FR')} FCFA
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {!savedInvoice && (
                 <div className="mt-8 space-y-2">
@@ -627,6 +732,7 @@ export function InvoiceCreator({ type, onCancel, onSaved, existingInvoice }: Inv
                             client={savedInvoice.clients || { name: 'Client' }}
                             invoice={savedInvoice}
                             items={savedInvoice.invoice_items || []}
+                            payments={savedInvoice.payments || []}
                             showBrand={!limits.pdfBrand}
                           />
                         }

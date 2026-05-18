@@ -336,6 +336,7 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
                               client={inv.clients || { name: 'Client' }}
                               invoice={inv}
                               items={inv.invoice_items || [{ description: 'Service', quantity: 1, unit_price: inv.total_ttc / 1.18, tva_rate: 18, amount_ht: inv.total_ttc / 1.18 }]}
+                              payments={inv.payments || []}
                               showBrand={!limits.pdfBrand}
                             />
                           }

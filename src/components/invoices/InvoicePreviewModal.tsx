@@ -12,9 +12,17 @@ interface Props {
   showBrand: boolean;
 }
 
+const METHOD_LABEL: Record<string, string> = {
+  wave: 'Wave', om: 'Orange Money', mtn: 'MTN Money',
+  cash: 'Espèces', transfer: 'Virement', check: 'Chèque',
+};
+
 export function InvoicePreviewModal({ onClose, company, invoice, showBrand }: Props) {
   const client = invoice.clients || { name: 'Client inconnu' };
   const items: any[] = invoice.invoice_items || [];
+  const payments: any[] = invoice.payments || [];
+  const paidTotal = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
+  const remaining = Math.max(0, Number(invoice.total_ttc || 0) - paidTotal);
   const isInvoice = invoice.type === 'invoice';
 
   return (
@@ -37,6 +45,7 @@ export function InvoicePreviewModal({ onClose, company, invoice, showBrand }: Pr
               client={client}
               invoice={invoice}
               items={items}
+              payments={payments}
               showBrand={showBrand}
             />
           }
@@ -194,6 +203,36 @@ export function InvoicePreviewModal({ onClose, company, invoice, showBrand }: Pr
                   {(invoice.total_ttc || 0).toLocaleString('fr-FR')} FCFA
                 </span>
               </div>
+
+              {payments.length > 0 && (
+                <>
+                  <p style={{ fontSize: '9px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '14px 0 6px' }}>
+                    Acomptes versés
+                  </p>
+                  {payments.map((p, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '11px', color: '#475569' }}>
+                      <span>
+                        {METHOD_LABEL[p.method] || p.method || 'Paiement'}
+                        {p.payment_date ? ` — ${new Date(p.payment_date).toLocaleDateString('fr-FR')}` : ''}
+                        {p.reference ? ` (${p.reference})` : ''}
+                      </span>
+                      <span style={{ fontFamily: 'monospace' }}>-{Number(p.amount).toLocaleString('fr-FR')} FCFA</span>
+                    </div>
+                  ))}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: '1px solid #e2e8f0', marginTop: '4px', fontSize: '11px', fontWeight: 700 }}>
+                    <span>Total versé</span>
+                    <span style={{ fontFamily: 'monospace' }}>{paidTotal.toLocaleString('fr-FR')} FCFA</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0 6px', marginTop: '6px', borderTop: `2px solid ${remaining > 0 ? '#d97706' : '#059669'}` }}>
+                    <span style={{ fontSize: '13px', fontWeight: 900, color: remaining > 0 ? '#92400e' : '#065f46' }}>
+                      {remaining > 0 ? 'NET À PAYER' : 'SOLDÉE'}
+                    </span>
+                    <span style={{ fontSize: '16px', fontWeight: 900, color: remaining > 0 ? '#92400e' : '#059669', fontFamily: 'monospace' }}>
+                      {remaining.toLocaleString('fr-FR')} FCFA
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 

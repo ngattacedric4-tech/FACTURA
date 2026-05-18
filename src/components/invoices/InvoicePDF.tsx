@@ -141,16 +141,31 @@ const styles = StyleSheet.create({
   }
 });
 
+interface PaymentLine {
+  amount: number;
+  method?: string;
+  reference?: string | null;
+  payment_date?: string;
+}
+
 interface InvoicePDFProps {
   company: Company;
   client: Client;
   invoice: Invoice;
   items: InvoiceItem[];
+  payments?: PaymentLine[];
   showBrand?: boolean;
 }
 
-export const InvoicePDF = ({ company, client, invoice, items, showBrand = true }: InvoicePDFProps) => {
+const METHOD_LABEL: Record<string, string> = {
+  wave: 'Wave', om: 'Orange Money', mtn: 'MTN Money',
+  cash: 'Espèces', transfer: 'Virement', check: 'Chèque',
+};
+
+export const InvoicePDF = ({ company, client, invoice, items, payments = [], showBrand = true }: InvoicePDFProps) => {
   const isInvoice = invoice.type === 'invoice';
+  const paidTotal = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
+  const remaining = Math.max(0, Number(invoice.total_ttc || 0) - paidTotal);
 
   return (
     <Document>
@@ -233,6 +248,34 @@ export const InvoicePDF = ({ company, client, invoice, items, showBrand = true }
             <Text style={styles.grandTotalLabel}>TOTAL TTC</Text>
             <Text style={styles.grandTotalValue}>{invoice.total_ttc.toLocaleString('fr-FR')} FCFA</Text>
           </View>
+
+          {payments.length > 0 && (
+            <>
+              <Text style={[styles.metaLabel, { marginTop: 12, marginBottom: 4 }]}>Acomptes versés</Text>
+              {payments.map((p, i) => (
+                <View key={i} style={styles.totalRow}>
+                  <Text style={{ fontSize: 9 }}>
+                    {METHOD_LABEL[p.method || ''] || p.method || 'Paiement'}
+                    {p.payment_date ? ` — ${new Date(p.payment_date).toLocaleDateString('fr-FR')}` : ''}
+                    {p.reference ? ` (${p.reference})` : ''}
+                  </Text>
+                  <Text style={{ fontSize: 9 }}>-{Number(p.amount).toLocaleString('fr-FR')} FCFA</Text>
+                </View>
+              ))}
+              <View style={[styles.totalRow, { borderTopWidth: 1, borderTopColor: '#e2e8f0', marginTop: 4, paddingTop: 6 }]}>
+                <Text style={{ fontWeight: 'bold' }}>Total versé</Text>
+                <Text style={{ fontWeight: 'bold' }}>{paidTotal.toLocaleString('fr-FR')} FCFA</Text>
+              </View>
+              <View style={[styles.grandTotalRow, { borderTopColor: remaining > 0 ? '#d97706' : '#059669' }]}>
+                <Text style={[styles.grandTotalLabel, { color: remaining > 0 ? '#92400e' : '#065f46' }]}>
+                  {remaining > 0 ? 'NET À PAYER' : 'SOLDÉE'}
+                </Text>
+                <Text style={[styles.grandTotalValue, { color: remaining > 0 ? '#92400e' : '#059669' }]}>
+                  {remaining.toLocaleString('fr-FR')} FCFA
+                </Text>
+              </View>
+            </>
+          )}
         </View>
 
         {invoice.notes && (
