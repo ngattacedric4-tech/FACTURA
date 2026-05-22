@@ -62,6 +62,8 @@ export function AuthPages({ initialMode = 'login' }: { initialMode?: 'login' | '
           options: { emailRedirectTo: window.location.origin },
         });
         if (error) throw error;
+        // Meta Pixel: track signup conversion
+        (window as any).fbq?.('track', 'CompleteRegistration');
         toast.success('Inscription réussie ! Vérifiez votre email.');
       }
     } catch (error: any) {
